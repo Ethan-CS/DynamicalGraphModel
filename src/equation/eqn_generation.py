@@ -1,31 +1,7 @@
-"""
-To generate equations:
-- GET_SINGLES (base-case)
-- GET_EQUATIONS (recursive helper)
-
-GET_SINGLES(input graph, model):
-- initialise an empty list to store equations for singles
-- For each vertex v in the graph:
-    - For each model state s in the model:
-        - add EQN(v in state s) i.e. eqn for v being in state s to list of eqns
-- Return list  of equations for singles
-
-GET_EQUATIONS(graph, model, prev_eqns, length)
-- If length <= num vertices in graph: > Not reached full system size
-    - initialise a new list, next_eqns
-    - For eqn in prev_eqns:
-        - For term in eqn:
-            - If length of term == length:
-                - Add EQN(term) if not already added
-    - Add all from next_eqns to list to return
-    - Add all from recursive call to GET_EQUATIONS(graph, model, prev_eqns, length+1)
-    - Return equations
-Else return an empty list
-"""
 from cpyment import CModel
 import networkx
 from equation.Term import Vertex, Term
-from equation.model.helpers import dynamically_relevant
+from model_params.helpers import dynamically_relevant
 from model_params.helpers import Coupling, coupling_types
 
 
@@ -52,6 +28,25 @@ def get_single_equations(graph, model):
 
 
 def generate_equations(singles, length, graph, model):
+    """
+   Generates the required equations for the model defined by the specified contact network and compartmental model.
+
+   Parameters
+   ----------
+    singles : dict
+        LHS terms mapped to tuples of terms and coefficients on the RHS of the equation - the 'base-case,' of singles,
+         previously generated equations in subsequent recursive steps,
+    length : int
+        the length of term we are currently generating equations for (to avoid generating equations more than once)
+    graph : networkx.Graph
+        the model contact graph.
+    model : CModel
+        definition of the compartmental model.
+
+   Returns
+   -------
+   A dictionary containing the LHS terms mapped to the terms on the RHS
+   """
     equations = dict(singles)
     if length <= len(graph.nodes):
         for LHS in singles.keys():
@@ -63,7 +58,6 @@ def generate_equations(singles, length, graph, model):
         for eqn in next_eqns:
             if eqn not in equations:
                 equations[eqn] = next_eqns[eqn]
-
     return equations
 
 
@@ -118,7 +112,7 @@ def add_terms(v, term_clone, transition, neighbours_of_v):
 
 def derive(v, term_clone, graph, model):
     """
-    Computes the equation for the specified term.
+    Computes the equation for the specified term
     :param v: the vertex we are deriving (in the chain rule)
     :param term_clone: the rest of the terms (not currently derived)
     :param graph: the model contact graph
