@@ -22,16 +22,17 @@ GET_EQUATIONS(graph, model, prev_eqns, length)
     - Return equations
 Else return an empty list
 """
-from enum import Enum
 from cpyment import CModel
 import networkx
 from equation.Term import Vertex, Term
+from equation.model.helpers import dynamically_relevant
+from model_params.helpers import Coupling, coupling_types
 
 
-def get_singles_terms(graph, model):
+def get_single_equations(graph, model):
     """
     Given a contact graph and a compartmental model, returns the list of tuples containing only one vertex for which we
-    require equations in the dynamical system.
+    require equations in the dynamical system. These equations are used as the base case for equation generation.
 
     :type graph: networkx.Graph
     :type model: CModel
@@ -50,14 +51,29 @@ def get_singles_terms(graph, model):
     return singles_equations
 
 
-class Coupling(Enum):
-    NEIGHBOUR_ENTER = 0
-    NEIGHBOUR_EXIT = 1
-    ISOLATED_ENTER = 2
-    ISOLATED_EXIT = 3
+def generate_equations(singles, length, graph, model):
+    equations = dict(singles)
+    if length <= len(graph.nodes):
+        for LHS in singles.keys():
+            for term in singles[LHS]:
+                if len(term[0].vertices) == length and (not term[0] in equations):
+                    equations[term[0]] = chain_rule(term[0], graph, model)
+
+        next_eqns = generate_equations(equations, length + 1, graph, model)
+        for eqn in next_eqns:
+            if eqn not in equations:
+                equations[eqn] = next_eqns[eqn]
+
+    return equations
 
 
 def add_terms(v, term_clone, transition, neighbours_of_v):
+    neighbours_of_v_not_in_tuple = list(neighbours_of_v)
+    for vertex in neighbours_of_v:
+        for other_vertex in term_clone.vertices:
+            if vertex == other_vertex.node:
+                neighbours_of_v_not_in_tuple.remove(vertex)
+                break
     terms = []
     if transition[0] == Coupling.NEIGHBOUR_ENTER:
         # e.g. v is in state I, so change v to S and each neighbour in turn to I
@@ -65,6 +81,10 @@ def add_terms(v, term_clone, transition, neighbours_of_v):
         for n in neighbours_of_v:
             vertices = set(term_clone.vertices)
             vertices.add(Vertex(other_state_for_v, v.node))
+            for vertex in vertices:
+                if vertex.node == n:
+                    vertices.remove(vertex)
+                    break
             neighbour = Vertex(v.state, n)
             vertices.add(neighbour)
             terms.append((Term(list(vertices)), transition[2]))
@@ -74,6 +94,10 @@ def add_terms(v, term_clone, transition, neighbours_of_v):
         for n in neighbours_of_v:
             vertices = set(term_clone.vertices)
             vertices.add(v)
+            for vertex in vertices:
+                if vertex.node == n:
+                    vertices.remove(vertex)
+                    break
             vertices.add(Vertex(other_state_for_neighbours, n))
             terms.append((Term(list(vertices)), f'-{transition[2]}'))
     elif transition[0] == Coupling.ISOLATED_ENTER:
@@ -113,43 +137,9 @@ def derive(v, term_clone, graph, model):
     return all_terms
 
 
-# Maintain a global variable so that we do not
-# need to re-determine map each time it is needed
-_coupling_map = {}
-
-
-def coupling_types(model):
-    if _coupling_map == {}:
-        # Initialise the dictionary keys (one for each model state)
-        for state in model.states:
-            _coupling_map[state] = []
-
-        for state in model.states:
-            for couple in model.couplings:
-                # Get the situation under which a transition occurs
-                transition = model.couplings[couple][0].split(':')[0]
-                # Does the transition contain a state we are currently interested in?
-                if transition.count(state) > 0:
-                    if transition[0] == state:  # EXIT TRANSITION
-                        if transition.count('*') > 0:  # NEEDS A NEIGHBOUR
-                            _coupling_map[state].append((Coupling.NEIGHBOUR_EXIT, model.couplings[couple][0],
-                                                         model.couplings[couple][1]))
-                        else:
-                            _coupling_map[state].append((Coupling.ISOLATED_EXIT, model.couplings[couple][0],
-                                                         model.couplings[couple][1]))
-                    else:  # ENTRY TRANSITION
-                        if transition.count('*') > 0:  # NEEDS A NEIGHBOUR
-                            _coupling_map[state].append((Coupling.NEIGHBOUR_ENTER, model.couplings[couple][0],
-                                                         model.couplings[couple][1]))
-                        else:
-                            _coupling_map[state].append(Coupling.ISOLATED_ENTER, model.couplings[couple][0],
-                                                        model.couplings[couple][1])
-    return _coupling_map
-
-
 # d(vw)/dt = (dv/dt)w + v(dw/dt)
-def chain_rule(term: Term, graph, model):
-    vertices = term.vertices
+def chain_rule(term, graph, model):
+    vertices = list(term.vertices)
     all_terms = []
     for v in vertices:
         term_clone = Term(vertices)
@@ -158,18 +148,3 @@ def chain_rule(term: Term, graph, model):
         for term in terms:
             all_terms.append(term)
     return all_terms
-
-
-def dynamically_relevant(model):
-    """
-    Given a model, returns list of dynamically relevant model states.
-    That is, all those states that are involved in active transition
-    :type model: CModel
-    """
-    relevant = list()
-    for state in model.states:
-        for coupling in model.couplings:
-            if model.couplings[coupling][0].split(':')[0].count(state) > 0:
-                relevant.append(state)
-                break
-    return relevant

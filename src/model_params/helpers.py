@@ -1,0 +1,42 @@
+from enum import Enum
+
+
+class Coupling(Enum):
+    NEIGHBOUR_ENTER = 0
+    NEIGHBOUR_EXIT = 1
+    ISOLATED_ENTER = 2
+    ISOLATED_EXIT = 3
+
+
+# Maintain a global variable so that we do not
+# need to re-determine map each time it is needed
+_coupling_map = {}
+
+
+def coupling_types(model):
+    if _coupling_map == {}:
+        # Initialise the dictionary keys (one for each model state)
+        for state in model.states:
+            _coupling_map[state] = []
+
+        for state in model.states:
+            for couple in model.couplings:
+                # Get the situation under which a transition occurs
+                transition = model.couplings[couple][0].split(':')[0]
+                # Does the transition contain a state we are currently interested in?
+                if transition.count(state) > 0:
+                    if transition[0] == state:  # EXIT TRANSITION
+                        if transition.count('*') > 0:  # NEEDS A NEIGHBOUR
+                            _coupling_map[state].append((Coupling.NEIGHBOUR_EXIT, model.couplings[couple][0],
+                                                         model.couplings[couple][1]))
+                        else:
+                            _coupling_map[state].append((Coupling.ISOLATED_EXIT, model.couplings[couple][0],
+                                                         model.couplings[couple][1]))
+                    else:  # ENTRY TRANSITION
+                        if transition.count('*') > 0:  # NEEDS A NEIGHBOUR
+                            _coupling_map[state].append((Coupling.NEIGHBOUR_ENTER, model.couplings[couple][0],
+                                                         model.couplings[couple][1]))
+                        else:
+                            _coupling_map[state].append(Coupling.ISOLATED_ENTER, model.couplings[couple][0],
+                                                        model.couplings[couple][1])
+    return _coupling_map
