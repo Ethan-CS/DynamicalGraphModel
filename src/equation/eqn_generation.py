@@ -1,6 +1,11 @@
-from cpyment import CModel
+import copy
+
 import networkx
+from networkx import Graph
+
 from equation.Term import Vertex, Term
+from equation.closures import can_be_closed, replace_with_closures
+from model_params.cmodel import CModel
 from model_params.helpers import dynamically_relevant
 from model_params.helpers import Coupling, coupling_types
 
@@ -27,7 +32,7 @@ def get_single_equations(graph, model):
     return singles_equations
 
 
-def generate_equations(singles, length, graph, model):
+def generate_equations(singles, length, graph, model, closures=False):
     """
    Generates the required equations for the model defined by the specified contact network and compartmental model.
 
@@ -42,6 +47,8 @@ def generate_equations(singles, length, graph, model):
         the model contact graph.
     model : CModel
         definition of the compartmental model.
+    closures : bool
+        True if we are introducing moment closures on cut-vertices, false otherwise.
 
    Returns
    -------
@@ -50,48 +57,37 @@ def generate_equations(singles, length, graph, model):
     equations = dict(singles)
     if length <= len(graph.nodes):
         for LHS in singles.keys():
+            term: tuple
             for term in singles[LHS]:
                 if len(term[0].vertices) == length and (not term[0] in equations):
-                    equations[term[0]] = chain_rule(term[0], graph, model)
+                    equations[term[0]] = chain_rule(term[0], graph, model, closures)
 
-        next_eqns = generate_equations(equations, length + 1, graph, model)
-        for eqn in next_eqns:
-            if eqn not in equations:
-                equations[eqn] = next_eqns[eqn]
+        next_equations = generate_equations(equations, length + 1, graph, model, closures)
+        for eqn in next_equations:
+            equations[eqn] = next_equations[eqn]
     return equations
 
 
-def add_terms(v, term_clone, transition, neighbours_of_v):
-    neighbours_of_v_not_in_tuple = list(neighbours_of_v)
-    for vertex in neighbours_of_v:
-        for other_vertex in term_clone.vertices:
-            if vertex == other_vertex.node:
-                neighbours_of_v_not_in_tuple.remove(vertex)
-                break
+def add_terms(v: Vertex, term: Term, transition: tuple, neighbours_of_v: list):
+    term_clone = copy.deepcopy(term)  # make sure we don't amend the original term
+    neighbours_of_v_not_in_tuple = list(set(neighbours_of_v) - set(term_clone.node_list()))
     terms = []
     if transition[0] == Coupling.NEIGHBOUR_ENTER:
         # e.g. v is in state I, so change v to S and each neighbour in turn to I
-        other_state_for_v = transition[1][0]
-        for n in neighbours_of_v:
+        other_state_for_v = transition[1][0]  # the state v would be in before transitioning to current state
+        for n in neighbours_of_v_not_in_tuple:
+            # Make sure new term contains all same terms as original
             vertices = set(term_clone.vertices)
             vertices.add(Vertex(other_state_for_v, v.node))
-            for vertex in vertices:
-                if vertex.node == n:
-                    vertices.remove(vertex)
-                    break
-            neighbour = Vertex(v.state, n)
-            vertices.add(neighbour)
-            terms.append((Term(list(vertices)), transition[2]))
+            # Add the neighbour in the transition-inducing state
+            vertices.add(Vertex(v.state, n))
+            terms.append((Term(list(vertices)), f'+{transition[2]}'))
     elif transition[0] == Coupling.NEIGHBOUR_EXIT:
         # e.g. v in state S so can exit if any neighbour in I
         other_state_for_neighbours = transition[1].split('*')[1][0]
         for n in neighbours_of_v:
             vertices = set(term_clone.vertices)
             vertices.add(v)
-            for vertex in vertices:
-                if vertex.node == n:
-                    vertices.remove(vertex)
-                    break
             vertices.add(Vertex(other_state_for_neighbours, n))
             terms.append((Term(list(vertices)), f'-{transition[2]}'))
     elif transition[0] == Coupling.ISOLATED_ENTER:
@@ -99,7 +95,7 @@ def add_terms(v, term_clone, transition, neighbours_of_v):
         other_state_for_v = transition[1][0]
         vertices = set(term_clone.vertices)
         vertices.add(Vertex(other_state_for_v, v.node))
-        terms.append((Term(list(vertices)), transition[2]))
+        terms.append((Term(list(vertices)), f'+{transition[2]}'))
     elif transition[0] == Coupling.ISOLATED_EXIT:
         # e.g. v in state I, transitions out without input of neighbours
         vertices = set(term_clone.vertices)
@@ -110,35 +106,44 @@ def add_terms(v, term_clone, transition, neighbours_of_v):
     return terms
 
 
-def derive(v, term_clone, graph, model):
-    """
-    Computes the equation for the specified term
-    :param v: the vertex we are deriving (in the chain rule)
-    :param term_clone: the rest of the terms (not currently derived)
-    :param graph: the model contact graph
-    :param model: definition of the compartmental model
-    :return: a list of tuples, each containing a term and the coefficient of the term
-    """
+def derive(v: Vertex, term_without_v: Term, graph: Graph, model: CModel, closures=False):
     # Get neighbours
     neighbours_of_v = [n for n in graph.neighbors(v.node)]
     # Get mapping of states to how they are entered/exited
     transitions = coupling_types(model)
     all_terms = []
     for transition in transitions[v.state]:
-        terms = add_terms(v, term_clone, transition, neighbours_of_v)
+        terms = add_terms(v, term_without_v, transition, neighbours_of_v)
         for t in terms:
-            all_terms.append(t)
+            if not closures:
+                all_terms.append(t)
+            else:
+                if not can_be_closed(t[0], graph):
+                    all_terms.append(t)
+                else:
+                    closure_terms = replace_with_closures(t[0], graph)
+                    for each_term in closure_terms:
+                        # new_term = []
+                        # for v in each_term:
+                        #     for w in t[0].vertices:
+                        #         if v == w:
+                        #             new_term.append(v)
+                        #         elif v == w.node:
+                        #             new_term.append((Vertex(w.state, v)))
+                        all_terms.append((Term(each_term), t[1]))
     return all_terms
 
 
 # d(vw)/dt = (dv/dt)w + v(dw/dt)
-def chain_rule(term, graph, model):
-    vertices = list(term.vertices)
+def chain_rule(term: Term, graph: Graph, model: CModel, closures=False):
     all_terms = []
-    for v in vertices:
-        term_clone = Term(vertices)
-        term_clone.vertices.remove(v)
-        terms = derive(v, term_clone, graph, model)
+    for v in list(term.vertices):
+        if type(term) == Term:
+            term_clone = copy.deepcopy(term)
+        else:
+            term_clone = copy.deepcopy(term[0])
+        term_clone.remove(v)
+        terms = derive(v, term_clone, graph, model, closures)
         for term in terms:
             all_terms.append(term)
     return all_terms

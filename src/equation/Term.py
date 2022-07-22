@@ -1,13 +1,24 @@
 class Term:
-    def __init__(self, _vertices):
+    def __init__(self, _vertices: list):
+        if type(_vertices) == tuple:
+            print("tuple!", _vertices[0])
         _vertices.sort()
-        self._vertices = _vertices
+        if type(_vertices[0]) == int:
+            new_vertices = []
+            for v in _vertices:
+                new_vertices.append(Vertex(' ', v))
+                self._vertices = _vertices
+        else:
+            self._vertices = _vertices
 
     def __str__(self):
         self._vertices.sort()
         string = "\u3008"
         for v in self._vertices:
-            string += f"{v.state}{v.node} "
+            if type(v) == Vertex:
+                string += f"{v.state}{v.node} "
+            else:
+                string += f"{v} "
         string = string[:-1] + "\u3009"
         return string
 
@@ -26,6 +37,25 @@ class Term:
     def __hash__(self):
         return tuple(self._vertices).__hash__()
 
+    def node_list(self):
+        nodes = []
+        for v in self.vertices:
+            if type(v) == Vertex:
+                nodes.append(v.node)
+            else:
+                nodes.append(v)
+        return nodes
+
+    def state_of(self, vertex):
+        for v in self._vertices:
+            if v == vertex:
+                return ' '
+            elif v.node == vertex:
+                return v.state
+
+    def remove(self, v):
+        self._vertices.remove(v)
+
 
 class Vertex:
     def __init__(self, state: chr, node: int):
@@ -36,13 +66,28 @@ class Vertex:
         return f"\u3008{self.state}{self.node}\u3009"
 
     def __lt__(self, other):
-        return self.node < other.node
+        if type(other) == Vertex:
+            return self.node < other.node
+        elif type(other) == int:
+            return self.node < other
+        else:
+            return False
 
     def __gt__(self, other):
-        return self.node > other.node
+        if type(other) == Vertex:
+            return self.node > other.node
+        elif type(other) == int:
+            return self.node > other
+        else:
+            return False
 
     def __eq__(self, other):
-        return self.node == other.node and self.state == other.state
+        if type(other) == Vertex:
+            return self.node == other.node and self.state == other.state
+        elif type(other) == int:
+            return self.node == other
+        else:
+            return False
 
     def __le__(self, other):
         return self.node <= other.node

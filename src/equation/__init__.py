@@ -1,7 +1,7 @@
 import networkx
-from cpyment import CModel
 
-from equation import eqn_generation
+from equation import eqn_generation, closures
+from model_params.cmodel import CModel
 
 SIR = CModel('SIR')
 SIR.set_coupling_rate('S*I:S=>I', 1, name='beta')  # Infection rate
@@ -15,8 +15,19 @@ def main():
 
     to_print = ''
     for term in equations.keys():
-        to_print += (f'\n{term}=')
+        to_print += f'\n{term}='
         for t in equations[term]:
+            to_print += str(t[1]) + str(t[0])
+
+    print(to_print)
+
+    print('***** CLOSURES *****')
+    closed_equations = eqn_generation.generate_equations(singles_equations, 2, p6, SIR, True)
+
+    to_print = ''
+    for term in closed_equations.keys():
+        to_print += f'\n{term}='
+        for t in closed_equations[term]:
             to_print += str(t[1]) + str(t[0])
 
     print(to_print)
