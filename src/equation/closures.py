@@ -34,8 +34,7 @@ def can_be_closed(term: Term, graph: Graph):
     """
     if len(term.vertices) < 3:
         return False
-    induced_subgraph = nx.subgraph(graph, term.node_list())
-    return len([nx.articulation_points(induced_subgraph)]) > 0
+    return len([nx.articulation_points(nx.subgraph(graph, term.node_list()))]) > 0
 
 
 def replace_with_closures(term: Term, graph: Graph):

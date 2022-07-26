@@ -57,11 +57,13 @@ def generate_equations(singles, length, graph, model, closures=False):
     equations = dict(singles)
     if length <= len(graph.nodes):
         for LHS in singles.keys():
-            term: tuple
             for term in singles[LHS]:
-                if len(term[0].vertices) == length and (not term[0] in equations):
+                # If term is up to length we're considering
+                # and not already in system, add equation for it
+                if len(term[0].vertices) <= length and (not term[0] in equations):
                     equations[term[0]] = chain_rule(term[0], graph, model, closures)
 
+        # Increase length we are interested in by 1 and recur
         next_equations = generate_equations(equations, length + 1, graph, model, closures)
         for eqn in next_equations:
             equations[eqn] = next_equations[eqn]
@@ -85,7 +87,7 @@ def add_terms(v: Vertex, term: Term, transition: tuple, neighbours_of_v: list):
     elif transition[0] == Coupling.NEIGHBOUR_EXIT:
         # e.g. v in state S so can exit if any neighbour in I
         other_state_for_neighbours = transition[1].split('*')[1][0]
-        for n in neighbours_of_v:
+        for n in neighbours_of_v_not_in_tuple:
             vertices = set(term_clone.vertices)
             vertices.add(v)
             vertices.add(Vertex(other_state_for_neighbours, n))
@@ -123,13 +125,6 @@ def derive(v: Vertex, term_without_v: Term, graph: Graph, model: CModel, closure
                 else:
                     closure_terms = replace_with_closures(t[0], graph)
                     for each_term in closure_terms:
-                        # new_term = []
-                        # for v in each_term:
-                        #     for w in t[0].vertices:
-                        #         if v == w:
-                        #             new_term.append(v)
-                        #         elif v == w.node:
-                        #             new_term.append((Vertex(w.state, v)))
                         all_terms.append((Term(each_term), t[1]))
     return all_terms
 
@@ -137,13 +132,17 @@ def derive(v: Vertex, term_without_v: Term, graph: Graph, model: CModel, closure
 # d(vw)/dt = (dv/dt)w + v(dw/dt)
 def chain_rule(term: Term, graph: Graph, model: CModel, closures=False):
     all_terms = []
-    for v in list(term.vertices):
-        if type(term) == Term:
-            term_clone = copy.deepcopy(term)
-        else:
-            term_clone = copy.deepcopy(term[0])
-        term_clone.remove(v)
+    if type(term) == Term:
+        term_clone = copy.deepcopy(term)
+    else:
+        term_clone = copy.deepcopy(term[0])
+    for v in list(term_clone.vertices):
+        try:
+            term_clone.remove(v)
+        except ValueError:
+            print(f"{str(v)} isn't in the term {term_clone}")
         terms = derive(v, term_clone, graph, model, closures)
         for term in terms:
             all_terms.append(term)
+        term_clone.add(v)
     return all_terms
