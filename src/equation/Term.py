@@ -1,8 +1,33 @@
+import sympy as sym
+
+
 class Term:
-    def __init__(self, _vertices: list):
+    def __init__(self, _vertices):
+        if type(_vertices) == sym.Symbol:
+            _vertices = str(_vertices)
+
+        if type(_vertices) == str:
+            if '*' in _vertices:
+                _vertices = _vertices.split('*', 1)[1]
+            # Remove left and right angle brackets, if necessary
+            _vertices = _vertices.replace('\u3008', '')
+            _vertices = _vertices.replace('\u3009', '')
+            # Remove all spaces
+            _vertices = _vertices.replace(" ", "")
+            new_vert = []
+            if sum(c.isdigit() for c in _vertices) == sum(c.isalpha() for c in _vertices):
+                # We have as many chars as ints, so all vertices have associated states
+                for i in range(0, 2*sum(c.isalpha() for c in _vertices), 2):
+                    new_vert.append(Vertex(str(_vertices[i]), int(_vertices[i+1])))
+            else:
+                for i in range(0, len(_vertices)):
+                    new_vert.append(Vertex(' ', _vertices[i]))
+            _vertices = new_vert
+
         if type(_vertices) == tuple:
             print("tuple!", _vertices[0])
         _vertices.sort()
+
         if type(_vertices[0]) == int:
             new_vertices = []
             for v in _vertices:

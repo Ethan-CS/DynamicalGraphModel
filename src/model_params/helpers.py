@@ -55,3 +55,4 @@ def dynamically_relevant(model):
                 relevant.append(state)
                 break
     return relevant
+

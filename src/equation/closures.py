@@ -1,3 +1,5 @@
+import copy
+
 import networkx as nx
 from networkx import Graph
 
@@ -39,7 +41,7 @@ def can_be_closed(term: Term, graph: Graph):
 
 def replace_with_closures(term: Term, graph: Graph):
     sub_terms = []
-    induced_subgraph = Graph(nx.subgraph(graph, list(term.node_list())))
+    induced_subgraph = Graph(nx.subgraph(copy.deepcopy(graph), list(term.node_list())))
     cut_vertices = list(nx.articulation_points(induced_subgraph))
     cut = cut_vertices[0]
     induced_subgraph.remove_node(cut)
