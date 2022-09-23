@@ -35,11 +35,17 @@ def main():
     print(lollipop_adj)
     lollipop = networkx.from_numpy_matrix(lollipop_adj)
 
-    all_equations = generate_equations(path, SIR)
+    all_equations = generate_equations(lollipop, SIR)
     print('EQUATIONS:')
     for e in all_equations:
         print(e)
     print('There were', len(all_equations), 'equations')
+
+    closed_equations = generate_equations(lollipop, SIR, closures=True)
+    print('EQUATIONS:')
+    for e in closed_equations:
+        print(e)
+    print('There were', len(closed_equations), 'equations')
 
 
 if __name__ == '__main__':

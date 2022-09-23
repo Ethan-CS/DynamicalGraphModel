@@ -57,21 +57,63 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
    """
     if prev_equations is None:
         prev_equations = get_single_equations(g, model)
+
     graph = copy.deepcopy(g)
     equations = prev_equations.copy()
     for eq in prev_equations:
-        for term in eq.rhs.args:
-            if '*' in str(term):
-                term = str(term).split('*', 1)[1]
+        rhs_terms = list(eq.rhs.args)
+        new_terms = list()
+        # for term in rhs_terms:
+        #     if type(term) == float or int:
+        #         rhs_terms.remove(term)
+        # Pre-formatting - get rid of coefficients and separate closure terms into individual terms
+        print('before formatting:', rhs_terms)
+
+        for term in rhs_terms:
+            formatted_term = copy.deepcopy(term)
+            if '*' in str(formatted_term):
+                formatted_term = list(str(term).split('*', 1))[1]
+            if '/' in str(formatted_term):
+                formatted_term = str(formatted_term).replace('/', '*')
+
+            # If term still contains *, means it's a closure term and needs splitting up
+            if '*' in str(formatted_term):
+                terms = str(formatted_term).split('*')
+                for t in terms:
+                    t = t.replace('*', '')
+                    if formatted_term not in new_terms and type(formatted_term) != float or int:
+                        new_terms.append(t)
+            elif formatted_term not in new_terms and type(formatted_term) != float or int:
+                new_terms.append(formatted_term)
+
+        print('after formatting:', new_terms)
+        rhs_terms = new_terms
+
+        for term in rhs_terms:
             lhs_terms = [str(each.lhs) for each in prev_equations]
             # If term is up to length we're considering
             # and not already in system, add equation for it
             if str(term) not in lhs_terms:
                 if sum(c.isdigit() for c in str(term)) <= length:
                     term_as_symbol = sym.Symbol(str(term))
-                    next_equation = sym.Eq(term_as_symbol, chain_rule(Term(term), graph, model, closures))
-                    if next_equation not in equations:
-                        equations.append(next_equation)
+                    if not closures:
+                        next_equation = sym.Eq(term_as_symbol, chain_rule(Term(term), graph, model, closures))
+                        if next_equation not in equations:
+                            equations.append(next_equation)
+                    else:
+                        if not can_be_closed(Term(term), graph):
+                            next_equation = sym.Eq(term_as_symbol, chain_rule(Term(term), graph, model, closures))
+                            if next_equation not in equations:
+                                equations.append(next_equation)
+                        else:
+                            closure_terms = replace_with_closures(term_as_symbol, graph)
+                            for small_term in closure_terms:
+                                if str(small_term) not in lhs_terms:
+                                    next_from_closures = sym.Eq(sym.Symbol(str(small_term)),
+                                                                chain_rule(Term(small_term),
+                                                                           graph, model, closures))
+                                    if next_from_closures not in equations:
+                                        equations.append(next_from_closures)
 
         # Increase length we are interested in by 1 and recur if length < num vertices in graph
     if length + 1 <= graph.number_of_nodes():
@@ -137,9 +179,9 @@ def derive(v: Vertex, term_without_v: Term, g: Graph, model: CModel, closures=Fa
                     all_terms += float(t[1]) * sym.Symbol(str(t[0]))
                 else:
                     closure_terms = replace_with_closures(t[0], graph)
-                    sub_terms = 0
+                    sub_terms = 1.0
                     for each_term in closure_terms:
-                        sub_terms += each_term
+                        sub_terms *= each_term
                     all_terms += float(t[1]) * sub_terms
     return all_terms
 
@@ -159,11 +201,7 @@ def chain_rule(term: Term, graph: Graph, model: CModel, closures=False):
             term_clone.remove(v)
         except ValueError:
             print(f"{str(v)} isn't in the term {term_clone}")
-        terms = 0
-        try:
-            terms = derive(v, term_clone, copy.deepcopy(graph), model, closures)
-        except networkx.NetworkXError:
-            print('the graph looked like this:', graph, graph.nodes, 'and networkx could not find a vertex')
+        terms = derive(v, term_clone, copy.deepcopy(graph), model, closures)
         all_terms += terms
         term_clone.add(v)
     return all_terms

@@ -3,7 +3,10 @@ import sympy as sym
 
 class Term:
     def __init__(self, _vertices):
-        if type(_vertices) == sym.Symbol:
+        if type(_vertices) == Term:
+            _vertices = _vertices.vertices()
+
+        if type(_vertices) == sym.Symbol or type(_vertices) == sym.Mul:
             _vertices = str(_vertices)
 
         if type(_vertices) == str:
@@ -17,16 +20,20 @@ class Term:
             new_vert = []
             if sum(c.isdigit() for c in _vertices) == sum(c.isalpha() for c in _vertices):
                 # We have as many chars as ints, so all vertices have associated states
-                for i in range(0, 2*sum(c.isalpha() for c in _vertices), 2):
-                    new_vert.append(Vertex(str(_vertices[i]), int(_vertices[i+1])))
+                for i in range(0, 2 * sum(c.isalpha() for c in _vertices), 2):
+                    try:
+                        new_vert.append(Vertex(str(_vertices[i]), int(_vertices[i + 1])))
+                    except ValueError:
+                        print('Got a value error for trying to make a term with these vertices', str(_vertices))
             else:
                 for i in range(0, len(_vertices)):
-                    new_vert.append(Vertex(' ', _vertices[i]))
+                    new_vert.append(Vertex(' ', int(_vertices[i])))
             _vertices = new_vert
+            _vertices.sort()
 
         if type(_vertices) == tuple:
             print("tuple!", _vertices[0])
-        _vertices.sort()
+            _vertices.sort()
 
         if type(_vertices[0]) == int:
             new_vertices = []
@@ -56,8 +63,9 @@ class Term:
         return self._vertices
 
     def __eq__(self, other):
-        return len(list(set(self.vertices)-set(other.vertices))) == 0 \
-               and len(list(set(other.vertices)-set(self.vertices))) == 0
+        o = Term(other)
+        return len(list(set(self.vertices) - set(o.vertices))) == 0 \
+               and len(list(set(o.vertices) - set(self.vertices))) == 0
 
     def __hash__(self):
         return tuple(self._vertices).__hash__()
@@ -124,4 +132,4 @@ class Vertex:
         return self.node != other.node or self.state != other.state
 
     def __hash__(self):
-        return 1+self.node.__hash__()
+        return 1 + self.node.__hash__()

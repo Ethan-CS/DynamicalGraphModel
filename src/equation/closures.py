@@ -1,6 +1,7 @@
 import copy
 
 import networkx as nx
+import sympy as sym
 from networkx import Graph
 
 from equation.Term import Term, Vertex
@@ -34,16 +35,23 @@ def can_be_closed(term: Term, graph: Graph):
     """
     Returns true if the specified term can be closed (i.e. contains a cut-vertex) and false otherwise.
     """
+    if type(term) == sym.Symbol:
+        term = Term(str(term))
+
     if len(term.vertices) < 3:
         return False
-    return len([nx.articulation_points(nx.subgraph(graph, term.node_list()))]) > 0
+    return len(list(nx.articulation_points(nx.subgraph(graph, term.node_list())))) != 0
 
 
 def replace_with_closures(term: Term, graph: Graph):
+    if type(term) == sym.Symbol:
+        term = Term(str(term))
+
     sub_terms = []
     induced_subgraph = Graph(nx.subgraph(copy.deepcopy(graph), list(term.node_list())))
     cut_vertices = list(nx.articulation_points(induced_subgraph))
     cut = cut_vertices[0]
+    sub_terms.append(1/sym.Symbol(str(Vertex('S', cut))))
     induced_subgraph.remove_node(cut)
     cc = list(nx.connected_components(induced_subgraph))
     graph_components = []
@@ -60,8 +68,7 @@ def replace_with_closures(term: Term, graph: Graph):
         for v in component:
             as_vertices.append(Vertex(original_states[v], v))
         if not can_be_closed(Term(list(as_vertices)), graph):
-            sub_terms.append(as_vertices)
+            sub_terms.append(sym.Symbol(str(Term(as_vertices))))
         else:
             replace_with_closures(Term(as_vertices), graph)
-
     return sub_terms
