@@ -63,38 +63,43 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
     for eq in prev_equations:
         rhs_terms = list(eq.rhs.args)
         new_terms = list()
-        # for term in rhs_terms:
-        #     if type(term) == float or int:
-        #         rhs_terms.remove(term)
         # Pre-formatting - get rid of coefficients and separate closure terms into individual terms
-        print('before formatting:', rhs_terms)
-
         for term in rhs_terms:
             formatted_term = copy.deepcopy(term)
             if '*' in str(formatted_term):
                 formatted_term = list(str(term).split('*', 1))[1]
+            # Replace / in closures with *, as we deal with them the same later
             if '/' in str(formatted_term):
                 formatted_term = str(formatted_term).replace('/', '*')
 
-            # If term still contains *, means it's a closure term and needs splitting up
+            # If term still contains *, means it's a closure term and needs splitting up into individual terms
             if '*' in str(formatted_term):
                 terms = str(formatted_term).split('*')
                 for t in terms:
                     t = t.replace('*', '')
                     if formatted_term not in new_terms and type(formatted_term) != float or int:
                         new_terms.append(t)
+            # If there are no *s remaining, must be a single term, so add as usual (if not numeric)
             elif formatted_term not in new_terms and type(formatted_term) != float or int:
                 new_terms.append(formatted_term)
 
-        print('after formatting:', new_terms)
         rhs_terms = new_terms
+
+        for t in rhs_terms:
+            try:
+                float(t)
+                rhs_terms.remove(t)
+            except ValueError:
+                pass
+            except TypeError:
+                pass
 
         for term in rhs_terms:
             lhs_terms = [str(each.lhs) for each in prev_equations]
             # If term is up to length we're considering
             # and not already in system, add equation for it
             if str(term) not in lhs_terms:
-                if sum(c.isdigit() for c in str(term)) <= length:
+                if sum(c.isalpha() for c in str(term)) <= length:
                     term_as_symbol = sym.Symbol(str(term))
                     if not closures:
                         next_equation = sym.Eq(term_as_symbol, chain_rule(Term(term), graph, model, closures))
