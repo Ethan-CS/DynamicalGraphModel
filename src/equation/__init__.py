@@ -1,11 +1,9 @@
-import copy
-import itertools
-
 import networkx
 import numpy as np
+import sympy as sym
 
-from datetime import datetime
 from equation import eqn_generation, closures
+from equation.Term import Term, Vertex
 from equation.eqn_generation import get_single_equations, generate_equations
 from model_params.cmodel import CModel
 
@@ -46,6 +44,39 @@ def main():
     for e in closed_equations:
         print(e)
     print('There were', len(closed_equations), 'equations')
+
+    lhs_terms = [str(each[0].lhs) for each in closed_equations]
+    print(lhs_terms)
+    t = sym.symbols('t')
+    IV = {sym.Function('〈S0〉')(t): 1,
+          sym.Function('〈S1〉')(t): 0.5,
+          sym.Function('〈S2〉')(t): 0.5,
+          sym.Function('〈S3〉')(t): 1,
+          sym.Function('〈I0〉')(t): 0,
+          sym.Function('〈I1〉')(t): 0.5,
+          sym.Function('〈I2〉')(t): 0.5,
+          sym.Function('〈I3〉')(t): 0,
+          sym.Function('〈S0 I1〉')(t): 0.5,
+          sym.Function('〈S0 I2〉')(t): 0.5,
+          sym.Function('〈I0 S1〉')(t): 0,
+          sym.Function('〈I0 S2〉')(t): 0,
+          sym.Function('〈S1 I2〉')(t): 0.25,
+          sym.Function('〈S1 I3〉')(t): 0,
+          sym.Function('〈I1 S2〉')(t): 0.25,
+          sym.Function('〈I1 S3〉')(t): 0.5,
+          sym.Function('〈S0 S1 I2〉')(t): 0.25,
+          sym.Function('〈S0 I1 I2〉')(t): 0.25,
+          sym.Function('〈S0 S1〉')(t): 0.5,
+          sym.Function('〈S0 I1 S2〉')(t): 0.25,
+          sym.Function('〈I0 S1 I2〉')(t): 0,
+          sym.Function('〈I0 S1 S2〉')(t): 0,
+          sym.Function('〈I0 I1 S2〉')(t): 0,
+          sym.Function('〈S1 S2〉')(t): 0.25,
+          sym.Function('〈S1 S3〉')(t): 0.5,
+          sym.Function('〈S0 S1 S2〉')(t): 0.25
+          }
+
+    sym.solvers.ode.dsolve(closed_equations, funcs=list(IV.keys()), ics=IV)
 
 
 if __name__ == '__main__':
