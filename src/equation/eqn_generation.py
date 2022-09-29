@@ -28,7 +28,8 @@ def get_single_equations(g, model):
         for node in graph.nodes:
             term = Vertex(state, node)
             singles_terms.append(term)
-            singles_equations.append(sym.Eq(sym.Symbol(str(term)), chain_rule(Term([term]), graph, model)))
+            singles_equations.append(sym.Eq(sym.Derivative(sym.Function(str(term))(sym.symbols('t'))),
+                                            chain_rule(Term([term]), graph, model)))
 
     return singles_equations
 
@@ -100,21 +101,21 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
             # and not already in system, add equation for it
             if str(term) not in lhs_terms:
                 if sum(c.isalpha() for c in str(term)) <= length:
-                    term_as_symbol = sym.Symbol(str(term))
+                    term_as_function = sym.Derivative(sym.Function(str(term))(sym.symbols('t')))
                     if not closures:
-                        next_equation = sym.Eq(term_as_symbol, chain_rule(Term(term), graph, model, closures))
+                        next_equation = sym.Eq(term_as_function, chain_rule(Term(term), graph, model, closures))
                         if next_equation not in equations:
                             equations.append(next_equation)
                     else:
                         if not can_be_closed(Term(term), graph):
-                            next_equation = sym.Eq(term_as_symbol, chain_rule(Term(term), graph, model, closures))
+                            next_equation = sym.Eq(term_as_function, chain_rule(Term(term), graph, model, closures))
                             if next_equation not in equations:
                                 equations.append(next_equation)
                         else:
-                            closure_terms = replace_with_closures(term_as_symbol, graph)
+                            closure_terms = replace_with_closures(term_as_function, graph)
                             for small_term in closure_terms:
                                 if str(small_term) not in lhs_terms:
-                                    next_from_closures = sym.Eq(sym.Symbol(str(small_term)),
+                                    next_from_closures = sym.Eq(sym.Function(str(small_term))(sym.symbols('t')),
                                                                 chain_rule(Term(small_term),
                                                                            graph, model, closures))
                                     if next_from_closures not in equations:
@@ -142,7 +143,7 @@ def add_terms(v: Vertex, term: Term, transition: tuple, neighbours_of_v: list):
             vertices.add(Vertex(other_state_for_v, v.node))
             # Add the neighbour in the transition-inducing state
             vertices.add(Vertex(v.state, n))
-            terms.append((sym.Symbol(str(Term(list(vertices)))), f'+{transition[2]}'))
+            terms.append((sym.Function(str(Term(list(vertices))))(sym.symbols('t')), f'+{transition[2]}'))
     elif transition[0] == Coupling.NEIGHBOUR_EXIT:
         # e.g. v in state S so can exit if any neighbour in I
         other_state_for_neighbours = transition[1].split('*')[1][0]
@@ -150,18 +151,18 @@ def add_terms(v: Vertex, term: Term, transition: tuple, neighbours_of_v: list):
             vertices = set(term_clone.vertices)
             vertices.add(v)
             vertices.add(Vertex(other_state_for_neighbours, n))
-            terms.append((sym.Symbol(str(Term(list(vertices)))), f'-{transition[2]}'))
+            terms.append((sym.Function(str(Term(list(vertices))))(sym.symbols('t')), f'-{transition[2]}'))
     elif transition[0] == Coupling.ISOLATED_ENTER:
         # e.g. v in state R, gets there through recovery after being in i
         other_state_for_v = transition[1][0]
         vertices = set(term_clone.vertices)
         vertices.add(Vertex(other_state_for_v, v.node))
-        terms.append((sym.Symbol(str(Term(list(vertices)))), f'+{transition[2]}'))
+        terms.append((sym.Function(str(Term(list(vertices))))(sym.symbols('t')), f'+{transition[2]}'))
     elif transition[0] == Coupling.ISOLATED_EXIT:
         # e.g. v in state I, transitions out without input of neighbours
         vertices = set(term_clone.vertices)
         vertices.add(v)
-        terms.append((sym.Symbol(str(Term(list(vertices)))), f'-{transition[2]}'))
+        terms.append((sym.Function(str(Term(list(vertices))))(sym.symbols('t')), f'-{transition[2]}'))
     else:
         print('nothing I could do!')
     return terms
@@ -178,10 +179,10 @@ def derive(v: Vertex, term_without_v: Term, g: Graph, model: CModel, closures=Fa
         terms = add_terms(v, term_without_v, transition, neighbours_of_v)
         for t in terms:
             if not closures:
-                all_terms += float(t[1]) * sym.Symbol(str(t[0]))
+                all_terms += float(t[1]) * sym.Function(str(t[0]))(t)
             else:
                 if not can_be_closed(t[0], graph):
-                    all_terms += float(t[1]) * sym.Symbol(str(t[0]))
+                    all_terms += float(t[1]) * sym.Function(str(t[0]))(t)
                 else:
                     closure_terms = replace_with_closures(t[0], graph)
                     sub_terms = 1.0
