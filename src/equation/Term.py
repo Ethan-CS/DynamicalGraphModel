@@ -15,40 +15,13 @@ def is_valid(candidate: str):
 class Term:
     def __init__(self, _vertices):
         assert _vertices != [], 'Vertex list is empty'
-        if type(_vertices) == Term:
-            _vertices = _vertices.vertices()
-
-        if type(_vertices) == sym.Symbol or type(_vertices) == sym.Mul:
-            _vertices = str(_vertices)
-
         if type(_vertices) == str:
-            if '/' in _vertices:
-                _vertices = _vertices.split('/', 1)[0]
-            if '*' in _vertices:
-                _vertices = _vertices.split('*', 1)[1]
-            # Remove left and right angle brackets, if necessary
-            _vertices = _vertices.replace('\u3008', '')
-            _vertices = _vertices.replace('\u3009', '')
-            # Remove all spaces
-            _vertices = _vertices.replace(" ", "")
-            new_vert = []
-            separated = re.findall(r"[^\W\d_]+|\d+", _vertices)  # creates array with chars and ints separated
-            if type(separated[0]) == str:
-                for i in range(0, len(separated)-1, 2):
-                    new_vert.append(Vertex(separated[i], separated[i+1]))
-            else:
-                for i in range(0, len(_vertices)):
-                    new_vert.append(Vertex(' ', int(_vertices[i])))
-            _vertices = new_vert
-            _vertices.sort()
-
-        if type(_vertices[0]) == int:
-            new_vertices = []
-            for v in _vertices:
-                new_vertices.append(Vertex(' ', v))
-                self._vertices = _vertices
-        else:
-            self._vertices = _vertices
+            _vertices = vertices_to_list(_vertices)
+        assert type(_vertices) == list, f'Vertex set must be a list, you provided:' \
+                                        f'\nVertex set: {_vertices}, type: {type(_vertices)}'
+        for v in _vertices:
+            assert type(v) == Vertex, 'not all entries in provided list were vertices'
+        self._vertices = _vertices
 
     def __str__(self):
         self._vertices.sort()
@@ -65,14 +38,19 @@ class Term:
         self._vertices.append(vertex)
         self._vertices.sort()
 
+    def function(self):
+        return sym.Function(str(self))
+
     @property
     def vertices(self):
         return self._vertices
 
     def __eq__(self, other):
-        o = Term(other)
-        return len(list(set(self.vertices) - set(o.vertices))) == 0 \
-               and len(list(set(o.vertices) - set(self.vertices))) == 0
+        try:
+            o = Term(other)
+        except AssertionError:
+            return False
+        return len(list(set(self.vertices) - set(o.vertices))) == 0 and len(list(set(o.vertices) - set(self.vertices))) == 0
 
     def __hash__(self):
         return tuple(self._vertices).__hash__()
@@ -141,3 +119,12 @@ class Vertex:
 
     def __hash__(self):
         return 1 + self.node.__hash__()
+
+
+def vertices_to_list(term):
+    vertices = []
+    if type(term) == str:
+        split = re.findall(r"[^\W\d_]+|\d+", term.replace('(t)', '').replace('\u3008', '').replace('\u3009', ''))
+        for i in range(0, len(split) - 1, 2):
+            vertices.append(Vertex(split[i], split[i + 1]))
+    return vertices

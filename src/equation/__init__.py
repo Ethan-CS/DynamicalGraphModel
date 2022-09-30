@@ -28,55 +28,53 @@ def main():
     #         print("CLOSED:", len(closed_equations), "=", 5 * i - 3)
     #         closed_time_taken = datetime.now() - closed_start
 
-    path = networkx.cycle_graph(3)
-    lollipop_adj = np.array([[0, 1, 1, 0], [1, 0, 1, 1], [1, 1, 0, 0], [0, 1, 0, 0]])
-    print(lollipop_adj)
-    lollipop = networkx.from_numpy_matrix(lollipop_adj)
-
-    all_equations = generate_equations(lollipop, SIR)
+    cycle3 = networkx.cycle_graph(3)
+    triangle_equations = generate_equations(cycle3, SIR)
     print('EQUATIONS:')
-    for e in all_equations:
+    for e in triangle_equations:
         print(e)
-    print('There were', len(all_equations), 'equations')
+    print('There were', len(triangle_equations), 'equations')
 
-    closed_equations = generate_equations(lollipop, SIR, closures=True)
-    print('EQUATIONS:')
-    for e in closed_equations:
-        print(e)
-    print('There were', len(closed_equations), 'equations')
-
-    lhs_terms = [str(each[0].lhs) for each in closed_equations]
-    print(lhs_terms)
-    t = sym.symbols('t')
-    IV = {sym.Function('〈S0〉')(t): 1,
-          sym.Function('〈S1〉')(t): 0.5,
-          sym.Function('〈S2〉')(t): 0.5,
-          sym.Function('〈S3〉')(t): 1,
-          sym.Function('〈I0〉')(t): 0,
-          sym.Function('〈I1〉')(t): 0.5,
-          sym.Function('〈I2〉')(t): 0.5,
-          sym.Function('〈I3〉')(t): 0,
-          sym.Function('〈S0 I1〉')(t): 0.5,
-          sym.Function('〈S0 I2〉')(t): 0.5,
-          sym.Function('〈I0 S1〉')(t): 0,
-          sym.Function('〈I0 S2〉')(t): 0,
-          sym.Function('〈S1 I2〉')(t): 0.25,
-          sym.Function('〈S1 I3〉')(t): 0,
-          sym.Function('〈I1 S2〉')(t): 0.25,
-          sym.Function('〈I1 S3〉')(t): 0.5,
-          sym.Function('〈S0 S1 I2〉')(t): 0.25,
-          sym.Function('〈S0 I1 I2〉')(t): 0.25,
-          sym.Function('〈S0 S1〉')(t): 0.5,
-          sym.Function('〈S0 I1 S2〉')(t): 0.25,
-          sym.Function('〈I0 S1 I2〉')(t): 0,
-          sym.Function('〈I0 S1 S2〉')(t): 0,
-          sym.Function('〈I0 I1 S2〉')(t): 0,
-          sym.Function('〈S1 S2〉')(t): 0.25,
-          sym.Function('〈S1 S3〉')(t): 0.5,
-          sym.Function('〈S0 S1 S2〉')(t): 0.25
-          }
-
-    sym.solvers.ode.dsolve(closed_equations, funcs=list(IV.keys()), ics=IV)
+    # lollipop_adj = np.array([[0, 1, 1, 0], [1, 0, 1, 1], [1, 1, 0, 0], [0, 1, 0, 0]])
+    # lollipop = networkx.from_numpy_matrix(lollipop_adj)
+    # closed_equations = generate_equations(lollipop, SIR, closures=True)
+    # print('EQUATIONS:')
+    # for e in closed_equations:
+    #     print(e)
+    # print('There were', len(closed_equations), 'equations')
+    #
+    # lhs_terms = [str(each.lhs) for each in closed_equations]
+    # print(lhs_terms)
+    # t = sym.symbols('t')
+    # IV = {sym.Function('〈S0〉')(t): 1,
+    #       sym.Function('〈S1〉')(t): 0.5,
+    #       sym.Function('〈S2〉')(t): 0.5,
+    #       sym.Function('〈S3〉')(t): 1,
+    #       sym.Function('〈I0〉')(t): 0,
+    #       sym.Function('〈I1〉')(t): 0.5,
+    #       sym.Function('〈I2〉')(t): 0.5,
+    #       sym.Function('〈I3〉')(t): 0,
+    #       sym.Function('〈S0 I1〉')(t): 0.5,
+    #       sym.Function('〈S0 I2〉')(t): 0.5,
+    #       sym.Function('〈I0 S1〉')(t): 0,
+    #       sym.Function('〈I0 S2〉')(t): 0,
+    #       sym.Function('〈S1 I2〉')(t): 0.25,
+    #       sym.Function('〈S1 I3〉')(t): 0,
+    #       sym.Function('〈I1 S2〉')(t): 0.25,
+    #       sym.Function('〈I1 S3〉')(t): 0.5,
+    #       sym.Function('〈S0 S1 I2〉')(t): 0.25,
+    #       sym.Function('〈S0 I1 I2〉')(t): 0.25,
+    #       sym.Function('〈S0 S1〉')(t): 0.5,
+    #       sym.Function('〈S0 I1 S2〉')(t): 0.25,
+    #       sym.Function('〈I0 S1 I2〉')(t): 0,
+    #       sym.Function('〈I0 S1 S2〉')(t): 0,
+    #       sym.Function('〈I0 I1 S2〉')(t): 0,
+    #       sym.Function('〈S1 S2〉')(t): 0.25,
+    #       sym.Function('〈S1 S3〉')(t): 0.5,
+    #       sym.Function('〈S0 S1 S2〉')(t): 0.25
+    #       }
+    #
+    # sym.solvers.ode.dsolve(closed_equations, funcs=list(IV.keys()), ics=IV)
 
 
 if __name__ == '__main__':

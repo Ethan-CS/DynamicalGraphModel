@@ -63,12 +63,14 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
     equations = prev_equations.copy()
     for eq in prev_equations:
         rhs_terms = list(eq.rhs.args)
+        print('RHS TERMS:', rhs_terms)
         new_terms = list()
         # Pre-formatting - get rid of coefficients and separate closure terms into individual terms
         for term in rhs_terms:
             formatted_term = copy.deepcopy(term)
+            formatted_term = str(formatted_term).replace('(t)', '').replace('-', '')
             if '*' in str(formatted_term):
-                formatted_term = list(str(term).split('*', 1))[1]
+                formatted_term = list(str(formatted_term).split('*', 1))[1]
             # Replace / in closures with *, as we deal with them the same later
             if '/' in str(formatted_term):
                 formatted_term = str(formatted_term).replace('/', '*')
@@ -78,37 +80,30 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
                 terms = str(formatted_term).split('*')
                 for t in terms:
                     t = t.replace('*', '')
-                    if formatted_term not in new_terms and type(formatted_term) != float or int:
-                        new_terms.append(t)
+                    if t not in new_terms:
+                        new_terms.append(Term(t))
             # If there are no *s remaining, must be a single term, so add as usual (if not numeric)
-            elif formatted_term not in new_terms and type(formatted_term) != float or int:
-                new_terms.append(formatted_term)
+            elif formatted_term not in new_terms:
+                new_terms.append(Term(formatted_term))
 
+        print('FORMATTED RHS: ')
+        for term in new_terms:
+            print(term)
         rhs_terms = new_terms
-
-        for t in rhs_terms:
-            try:
-                float(t)
-                rhs_terms.remove(t)
-            except ValueError:
-                pass
-            except TypeError:
-                pass
-
         for term in rhs_terms:
-            lhs_terms = [str(each.lhs) for each in prev_equations]
+            lhs_terms = [each.lhs for each in prev_equations]
             # If term is up to length we're considering
             # and not already in system, add equation for it
-            if str(term) not in lhs_terms:
+            if term not in lhs_terms:
                 if sum(c.isalpha() for c in str(term)) <= length:
-                    term_as_function = sym.Derivative(sym.Function(str(term))(sym.symbols('t')))
+                    term_as_function = term.function()
                     if not closures:
-                        next_equation = sym.Eq(term_as_function, chain_rule(Term(term), graph, model, closures))
+                        next_equation = sym.Eq(sym.Derivative(term_as_function(sym.symbols('t'))), chain_rule(term, graph, model, closures))
                         if next_equation not in equations:
                             equations.append(next_equation)
                     else:
                         if not can_be_closed(Term(term), graph):
-                            next_equation = sym.Eq(term_as_function, chain_rule(Term(term), graph, model, closures))
+                            next_equation = sym.Eq(sym.Derivative(term_as_function(sym.symbols('t'))), chain_rule(Term(term), graph, model, closures))
                             if next_equation not in equations:
                                 equations.append(next_equation)
                         else:
@@ -143,7 +138,7 @@ def add_terms(v: Vertex, term: Term, transition: tuple, neighbours_of_v: list):
             vertices.add(Vertex(other_state_for_v, v.node))
             # Add the neighbour in the transition-inducing state
             vertices.add(Vertex(v.state, n))
-            terms.append((sym.Function(str(Term(list(vertices))))(sym.symbols('t')), f'+{transition[2]}'))
+            terms.append(transition[2] * Term(list(vertices)).function()(sym.symbols('t')))
     elif transition[0] == Coupling.NEIGHBOUR_EXIT:
         # e.g. v in state S so can exit if any neighbour in I
         other_state_for_neighbours = transition[1].split('*')[1][0]
@@ -151,18 +146,18 @@ def add_terms(v: Vertex, term: Term, transition: tuple, neighbours_of_v: list):
             vertices = set(term_clone.vertices)
             vertices.add(v)
             vertices.add(Vertex(other_state_for_neighbours, n))
-            terms.append((sym.Function(str(Term(list(vertices))))(sym.symbols('t')), f'-{transition[2]}'))
+            terms.append(-transition[2] * Term(list(vertices)).function()(sym.symbols('t')))
     elif transition[0] == Coupling.ISOLATED_ENTER:
         # e.g. v in state R, gets there through recovery after being in i
         other_state_for_v = transition[1][0]
         vertices = set(term_clone.vertices)
         vertices.add(Vertex(other_state_for_v, v.node))
-        terms.append((sym.Function(str(Term(list(vertices))))(sym.symbols('t')), f'+{transition[2]}'))
+        terms.append(transition[2] * Term(list(vertices)).function()(sym.symbols('t')))
     elif transition[0] == Coupling.ISOLATED_EXIT:
         # e.g. v in state I, transitions out without input of neighbours
         vertices = set(term_clone.vertices)
         vertices.add(v)
-        terms.append((sym.Function(str(Term(list(vertices))))(sym.symbols('t')), f'-{transition[2]}'))
+        terms.append(-transition[2] * Term(list(vertices)).function()(sym.symbols('t')))
     else:
         print('nothing I could do!')
     return terms
@@ -179,34 +174,26 @@ def derive(v: Vertex, term_without_v: Term, g: Graph, model: CModel, closures=Fa
         terms = add_terms(v, term_without_v, transition, neighbours_of_v)
         for t in terms:
             if not closures:
-                all_terms += float(t[1]) * sym.Function(str(t[0]))(t)
+                all_terms += t
             else:
-                if not can_be_closed(t[0], graph):
-                    all_terms += float(t[1]) * sym.Function(str(t[0]))(t)
+                if not can_be_closed(t, graph):
+                    all_terms += t
                 else:
-                    closure_terms = replace_with_closures(t[0], graph)
+                    closure_terms = replace_with_closures(t, graph)
                     sub_terms = 1.0
                     for each_term in closure_terms:
                         sub_terms *= each_term
-                    all_terms += float(t[1]) * sub_terms
+                    all_terms += t
     return all_terms
 
 
 # d(vw)/dt = (dv/dt)w + v(dw/dt)
 def chain_rule(term: Term, graph: Graph, model: CModel, closures=False):
-    if type(term) == Term:
-        term_clone = copy.deepcopy(term)
-    elif type(term) == tuple:
-        term_clone = copy.deepcopy(term[0])
-    else:
-        term_clone = Term(str(term))
+    term_clone = copy.deepcopy(term)
 
     all_terms = 0
     for v in list(term_clone.vertices):
-        try:
-            term_clone.remove(v)
-        except ValueError:
-            print(f"{str(v)} isn't in the term {term_clone}")
+        term_clone.remove(v)
         terms = derive(v, term_clone, copy.deepcopy(graph), model, closures)
         all_terms += terms
         term_clone.add(v)

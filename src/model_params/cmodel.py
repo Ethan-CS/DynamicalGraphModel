@@ -7,7 +7,6 @@ from numba import jit
 
 FitResult = namedtuple('FitResult', ['C', 'y0', 'R2', 'MRPD', 'success'])
 
-
 @jit(nopython=True)
 def _gillespie(tmax, y0, C, i1, i2, i3, i4, sN, tblock=100):
     nC = len(C)
@@ -714,3 +713,8 @@ class CModel(object):
         lv.set_coupling_rate('P:P=>', delta, 'delta')
 
         return lv
+
+
+SIR = CModel('SIR')
+SIR.set_coupling_rate('S*I:S=>I', 1, name='beta')  # Infection rate
+SIR.set_coupling_rate('I:I=>R', 3, name='gamma')   # Recovery rate
