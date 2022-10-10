@@ -1,4 +1,5 @@
 import copy
+import re
 
 import networkx
 import sympy as sym
@@ -8,6 +9,8 @@ from equation.Term import Vertex, Term
 from equation.closures import can_be_closed, replace_with_closures
 from model_params.cmodel import CModel
 from model_params.helpers import dynamically_relevant, Coupling, coupling_types
+
+t = sym.symbols('t')
 
 
 def get_single_equations(g, model):
@@ -28,8 +31,8 @@ def get_single_equations(g, model):
         for node in graph.nodes:
             term = Vertex(state, node)
             singles_terms.append(term)
-            singles_equations.append(sym.Eq(sym.Derivative(sym.Function(str(term))(sym.symbols('t'))),
-                                            chain_rule(Term([term]), graph, model)))
+            singles_equations.append(
+                sym.Eq(sym.Derivative(sym.Function(str(term))(t)), chain_rule(Term([term]), graph, model)))
 
     return singles_equations
 
@@ -63,56 +66,56 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
     equations = prev_equations.copy()
     for eq in prev_equations:
         rhs_terms = list(eq.rhs.args)
-        print('RHS TERMS:', rhs_terms)
         new_terms = list()
         # Pre-formatting - get rid of coefficients and separate closure terms into individual terms
         for term in rhs_terms:
+            try:
+                float(term)
+                continue
+            except TypeError:
+                pass
             formatted_term = copy.deepcopy(term)
-            formatted_term = str(formatted_term).replace('(t)', '').replace('-', '')
-            if '*' in str(formatted_term):
-                formatted_term = list(str(formatted_term).split('*', 1))[1]
-            # Replace / in closures with *, as we deal with them the same later
-            if '/' in str(formatted_term):
-                formatted_term = str(formatted_term).replace('/', '*')
+            formatted_term = str(formatted_term).replace('(t)', '').replace('-', '') \
+                .replace('〈', '').replace('〉', '').replace(' ', '')
+            formatted_term = format_term(formatted_term)
 
             # If term still contains *, means it's a closure term and needs splitting up into individual terms
             if '*' in str(formatted_term):
                 terms = str(formatted_term).split('*')
-                for t in terms:
-                    t = t.replace('*', '')
-                    if t not in new_terms:
-                        new_terms.append(Term(t))
+                for each_term in terms:
+                    each_term = each_term.replace('*', '')
+                    if each_term not in new_terms:
+                        new_terms.append(Term(each_term))
             # If there are no *s remaining, must be a single term, so add as usual (if not numeric)
             elif formatted_term not in new_terms:
                 new_terms.append(Term(formatted_term))
 
-        print('FORMATTED RHS: ')
-        for term in new_terms:
-            print(term)
         rhs_terms = new_terms
         for term in rhs_terms:
             lhs_terms = [each.lhs for each in prev_equations]
             # If term is up to length we're considering
             # and not already in system, add equation for it
-            if term not in lhs_terms:
+            if term not in lhs_terms and str(term) != '\u3009':
                 if sum(c.isalpha() for c in str(term)) <= length:
                     term_as_function = term.function()
                     if not closures:
-                        next_equation = sym.Eq(sym.Derivative(term_as_function(sym.symbols('t'))), chain_rule(term, graph, model, closures))
+                        next_equation = sym.Eq(sym.Derivative(term_as_function(sym.symbols('t'))),
+                                               chain_rule(term, graph, model, closures))
                         if next_equation not in equations:
                             equations.append(next_equation)
                     else:
-                        if not can_be_closed(Term(term), graph):
-                            next_equation = sym.Eq(sym.Derivative(term_as_function(sym.symbols('t'))), chain_rule(Term(term), graph, model, closures))
+                        if not can_be_closed(term, graph):
+                            next_equation = sym.Eq(sym.Derivative(term_as_function(sym.symbols('t'))),
+                                                   chain_rule(term, graph, model, closures))
                             if next_equation not in equations:
                                 equations.append(next_equation)
                         else:
                             closure_terms = replace_with_closures(term_as_function, graph)
                             for small_term in closure_terms:
-                                if str(small_term) not in lhs_terms:
-                                    next_from_closures = sym.Eq(sym.Function(str(small_term))(sym.symbols('t')),
-                                                                chain_rule(Term(small_term),
-                                                                           graph, model, closures))
+                                if small_term not in lhs_terms:
+                                    next_from_closures = sym.Eq(
+                                        sym.Function(format_term(str(small_term)))(sym.symbols('t')),
+                                        chain_rule(Term(format_term(str(small_term))), graph, model, closures))
                                     if next_from_closures not in equations:
                                         equations.append(next_from_closures)
 
@@ -123,6 +126,15 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
             if eqn not in equations:
                 equations.append(eqn)
     return equations
+
+
+def format_term(formatted_term):
+    if '*' in str(formatted_term):
+        formatted_term = list(str(formatted_term).split('*', 1))[1]
+    # Replace / in closures with *, as we deal with them the same later
+    if '/' in str(formatted_term):
+        formatted_term = str(formatted_term).replace('/', '*')
+    return formatted_term
 
 
 def add_terms(v: Vertex, term: Term, transition: tuple, neighbours_of_v: list):
@@ -172,18 +184,25 @@ def derive(v: Vertex, term_without_v: Term, g: Graph, model: CModel, closures=Fa
     all_terms = 0
     for transition in transitions[v.state]:
         terms = add_terms(v, term_without_v, transition, neighbours_of_v)
-        for t in terms:
+        for each_term in terms:
             if not closures:
-                all_terms += t
+                all_terms += each_term
             else:
-                if not can_be_closed(t, graph):
-                    all_terms += t
+                # Need to only consider the term, not any coefficients or dependencies
+                term_as_string = str(each_term)
+                if '*' in term_as_string:
+                    term_as_string = term_as_string.split('*', 1)[1]
+                cleaned = re.sub("[-.+*\u3008\u3009(t)]", "", term_as_string)
+                vertices = [Vertex(v[0], int(v[1:])) for v in cleaned.split()]
+                actual_term = Term(vertices)
+                if not can_be_closed(actual_term, graph):
+                    all_terms += each_term
                 else:
-                    closure_terms = replace_with_closures(t, graph)
+                    closure_terms = replace_with_closures(each_term, graph)
                     sub_terms = 1.0
-                    for each_term in closure_terms:
-                        sub_terms *= each_term
-                    all_terms += t
+                    for each_closure_term in closure_terms:
+                        sub_terms *= each_closure_term
+                    all_terms += sub_terms
     return all_terms
 
 

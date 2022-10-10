@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import networkx
 import numpy as np
 import sympy as sym
@@ -13,68 +15,21 @@ SIR.set_coupling_rate('I:I=>R', 3, name='gamma')   # Recovery rate
 
 
 def main():
-    # for i in range(1, 51):
-    #     path = networkx.path_graph(i)
-    #     singles_equations = eqn_generation.get_single_equations(path, SIR)
-    #
-    #     for _ in range(0, 10):
-    #         full_start = datetime.now()
-    #         equations = eqn_generation.generate_equations(singles_equations, 2, path, SIR)
-    #         print("REG:", len(equations), "=", int((3 * i * i - i + 2) / 2))
-    #         full_time_taken = datetime.now() - full_start
-    #
-    #         closed_start = datetime.now()
-    #         closed_equations = eqn_generation.generate_equations(singles_equations, 2, path, SIR, True)
-    #         print("CLOSED:", len(closed_equations), "=", 5 * i - 3)
-    #         closed_time_taken = datetime.now() - closed_start
+    for i in range(1, 20):
+        path = networkx.path_graph(i)
+        print(f'{i} VERTICES')
+        for _ in range(0, 10):
+            full_start = datetime.now()
+            equations = eqn_generation.generate_equations(path, SIR)
+            print("REG:", len(equations), "=", int((3 * i * i - i + 2) / 2))
+            full_time_taken = datetime.now() - full_start
+            print('FULL TIME TAKEN:', full_time_taken)
 
-    cycle3 = networkx.cycle_graph(3)
-    triangle_equations = generate_equations(cycle3, SIR)
-    print('EQUATIONS:')
-    for e in triangle_equations:
-        print(e)
-    print('There were', len(triangle_equations), 'equations')
-
-    # lollipop_adj = np.array([[0, 1, 1, 0], [1, 0, 1, 1], [1, 1, 0, 0], [0, 1, 0, 0]])
-    # lollipop = networkx.from_numpy_matrix(lollipop_adj)
-    # closed_equations = generate_equations(lollipop, SIR, closures=True)
-    # print('EQUATIONS:')
-    # for e in closed_equations:
-    #     print(e)
-    # print('There were', len(closed_equations), 'equations')
-    #
-    # lhs_terms = [str(each.lhs) for each in closed_equations]
-    # print(lhs_terms)
-    # t = sym.symbols('t')
-    # IV = {sym.Function('〈S0〉')(t): 1,
-    #       sym.Function('〈S1〉')(t): 0.5,
-    #       sym.Function('〈S2〉')(t): 0.5,
-    #       sym.Function('〈S3〉')(t): 1,
-    #       sym.Function('〈I0〉')(t): 0,
-    #       sym.Function('〈I1〉')(t): 0.5,
-    #       sym.Function('〈I2〉')(t): 0.5,
-    #       sym.Function('〈I3〉')(t): 0,
-    #       sym.Function('〈S0 I1〉')(t): 0.5,
-    #       sym.Function('〈S0 I2〉')(t): 0.5,
-    #       sym.Function('〈I0 S1〉')(t): 0,
-    #       sym.Function('〈I0 S2〉')(t): 0,
-    #       sym.Function('〈S1 I2〉')(t): 0.25,
-    #       sym.Function('〈S1 I3〉')(t): 0,
-    #       sym.Function('〈I1 S2〉')(t): 0.25,
-    #       sym.Function('〈I1 S3〉')(t): 0.5,
-    #       sym.Function('〈S0 S1 I2〉')(t): 0.25,
-    #       sym.Function('〈S0 I1 I2〉')(t): 0.25,
-    #       sym.Function('〈S0 S1〉')(t): 0.5,
-    #       sym.Function('〈S0 I1 S2〉')(t): 0.25,
-    #       sym.Function('〈I0 S1 I2〉')(t): 0,
-    #       sym.Function('〈I0 S1 S2〉')(t): 0,
-    #       sym.Function('〈I0 I1 S2〉')(t): 0,
-    #       sym.Function('〈S1 S2〉')(t): 0.25,
-    #       sym.Function('〈S1 S3〉')(t): 0.5,
-    #       sym.Function('〈S0 S1 S2〉')(t): 0.25
-    #       }
-    #
-    # sym.solvers.ode.dsolve(closed_equations, funcs=list(IV.keys()), ics=IV)
+            closed_start = datetime.now()
+            closed_equations = eqn_generation.generate_equations(path, SIR, closures=True)
+            print("CLOSED:", len(closed_equations), "=", 5 * i - 3)
+            closed_time_taken = datetime.now() - closed_start
+            print('CLOSURES TIME TAKEN:', closed_time_taken)
 
 
 if __name__ == '__main__':

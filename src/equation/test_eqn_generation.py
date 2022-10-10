@@ -1,25 +1,28 @@
 import networkx
+import sympy as sym
 
 from equation import eqn_generation
 from equation.Term import Vertex, Term
 import networkx as nx
 
-from equation.eqn_generation import get_single_equations
+from equation.eqn_generation import get_single_equations, generate_equations
 from model_params.cmodel import CModel
 
 SIR = CModel('SIR')
 SIR.set_coupling_rate('S*I:S=>I', 1, name='beta')  # Infection rate
 SIR.set_coupling_rate('I:I=>R', 3, name='gamma')  # Recovery rate
 
+t = sym.symbols('t')
+
 
 def test_get_single_equations():
     expected_terms = []
     for i in range(0, 50):
-        expected_terms.append(str(Term([Vertex('S', i)])))
-        expected_terms.append(str(Term([Vertex('I', i)])))
+        expected_terms.append(sym.Derivative(Term([Vertex('S', i)]).function()(t)))
+        expected_terms.append(sym.Derivative(Term([Vertex('I', i)]).function()(t)))
 
     actual_terms = get_single_equations(nx.erdos_renyi_graph(n=50, p=0.2), SIR)
-    lhs_terms = [str(each.lhs) for each in actual_terms]
+    lhs_terms = [each.lhs for each in actual_terms]
     for term in lhs_terms:
         assert term in expected_terms, f'Expected {str(term)} in actual terms, was not there'
 
@@ -38,3 +41,8 @@ def test_path_equations():
                                                                f'path on {i} vertices'
         assert len(closed_equations) == 5 * i - 3, 'incorrect number of equations for closed system for ' \
                                                    f'path on {i} vertices'
+
+
+def test_triangle_equations():
+    triangle_equations = generate_equations(networkx.cycle_graph(3), SIR)
+    assert len(triangle_equations) == 18, f'There were {len(triangle_equations)} equations. We expected 18.'

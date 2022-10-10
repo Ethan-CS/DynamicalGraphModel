@@ -122,9 +122,14 @@ class Vertex:
 
 
 def vertices_to_list(term):
+    if '/' in str(term):
+        term = str(term).replace('/', '*')
+    if '*' in str(term):
+        term = list(str(term).split('*', 1))[1]
+    term = term.replace('(t)', '').replace(' ', '').replace('\u3008', '').replace('\u3009', '')
     vertices = []
     if type(term) == str:
-        split = re.findall(r"[^\W\d_]+|\d+", term.replace('(t)', '').replace('\u3008', '').replace('\u3009', ''))
+        split = re.findall(r"[^\W\d_]+|\d+", term)
         for i in range(0, len(split) - 1, 2):
             vertices.append(Vertex(split[i], split[i + 1]))
     return vertices

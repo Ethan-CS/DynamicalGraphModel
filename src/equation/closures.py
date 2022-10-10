@@ -35,16 +35,13 @@ def can_be_closed(term: Term, graph: Graph):
     """
     Returns true if the specified term can be closed (i.e. contains a cut-vertex) and false otherwise.
     """
-    if type(term) == sym.Symbol:
-        term = Term(str(term))
-
     if len(term.vertices) < 3:
         return False
     return len(list(nx.articulation_points(nx.subgraph(graph, term.node_list())))) != 0
 
 
 def replace_with_closures(term: Term, graph: Graph):
-    if type(term) == sym.Symbol:
+    if type(term) == sym.Symbol or sym.Function:
         term = Term(str(term))
 
     sub_terms = []
