@@ -15,6 +15,7 @@ def is_valid(candidate: str):
 class Term:
     def __init__(self, _vertices):
         assert _vertices != [], 'Vertex list is empty'
+
         if type(_vertices) == str:
             _vertices = vertices_to_list(_vertices)
         assert type(_vertices) == list, f'Vertex set must be a list, you provided:' \
@@ -46,11 +47,18 @@ class Term:
         return self._vertices
 
     def __eq__(self, other):
-        try:
-            o = Term(other)
-        except AssertionError:
+        if type(other) == Term:
+            if len(self.vertices) != len(other.vertices):
+                return False
+            for v in self.vertices:
+                if v not in other.vertices:
+                    return False
+            for w in other.vertices:
+                if w not in self.vertices:
+                    return False
+            return True
+        else:
             return False
-        return len(list(set(self.vertices) - set(o.vertices))) == 0 and len(list(set(o.vertices) - set(self.vertices))) == 0
 
     def __hash__(self):
         return tuple(self._vertices).__hash__()
@@ -103,8 +111,6 @@ class Vertex:
     def __eq__(self, other):
         if type(other) == Vertex:
             return self.node == other.node and self.state == other.state
-        elif type(other) == int:
-            return self.node == other
         else:
             return False
 

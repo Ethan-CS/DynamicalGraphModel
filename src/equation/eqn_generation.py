@@ -24,15 +24,12 @@ def get_single_equations(g, model):
     :param model: A specified compartmental model
     :return: The list of single-vertex tuples for which we require equations
     """
-    graph = copy.deepcopy(g)
-    singles_terms = []
-    singles_equations = []
+    singles_terms, singles_equations = [], []
     for state in dynamically_relevant(model):
-        for node in graph.nodes:
-            term = Vertex(state, node)
+        for node in g.nodes:
+            term = Term([Vertex(state, node)])
             singles_terms.append(term)
-            singles_equations.append(
-                sym.Eq(sym.Derivative(sym.Function(str(term))(t)), chain_rule(Term([term]), graph, model)))
+            singles_equations.append(sym.Eq(sym.Derivative(sym.Function(str(term))(t)), chain_rule(term, g, model)))
 
     return singles_equations
 
@@ -59,72 +56,65 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
    -------
    A dictionary containing the LHS terms mapped to the terms on the RHS
    """
+    # If no prev equations provided, get the base case (singles equations)
     if prev_equations is None:
         prev_equations = get_single_equations(g, model)
+    # Get a list of the terms on LHS of previous equations
+    lhs_terms = [each.lhs for each in prev_equations]
+    # Start with previous equations as base case and add to that list
+    equations = list(prev_equations)
+    # Look through RHS terms of previous equations and add eqn for any terms that don't have one yet
+    all_rhs_terms = set()
+    for eq in equations:
+        LHS = str(eq.lhs).replace('Derivative', '').replace('(', '').replace(')', '').replace('\u3008', '') \
+            .replace('\u3009', '').replace('t', '').replace(',', '')
+        if len(LHS.split(' ')) == length:
+            rhs_terms = list(eq.rhs.args)
+            new_terms = list()
+            # Pre-formatting - ignore coefficients
+            for term in rhs_terms:
+                try:
+                    float(term)  # if this works, it's just a coefficient, so ignore it
+                    continue
+                except TypeError:
+                    pass
+                formatted_term = str(term).replace('(t)', '').replace('-', '') \
+                    .replace('\u3008', '').replace('\u3009', '').replace(' ', '')
+                formatted_term = format_term(formatted_term)
 
-    graph = copy.deepcopy(g)
-    equations = prev_equations.copy()
-    for eq in prev_equations:
-        rhs_terms = list(eq.rhs.args)
-        new_terms = list()
-        # Pre-formatting - get rid of coefficients and separate closure terms into individual terms
-        for term in rhs_terms:
-            try:
-                float(term)
-                continue
-            except TypeError:
-                pass
-            formatted_term = copy.deepcopy(term)
-            formatted_term = str(formatted_term).replace('(t)', '').replace('-', '') \
-                .replace('〈', '').replace('〉', '').replace(' ', '')
-            formatted_term = format_term(formatted_term)
+                # If term still contains *, means it's a closure term and needs splitting up into individual terms
+                if '*' in str(formatted_term):
+                    terms = str(formatted_term).split('*')
+                    for each_term in terms:
+                        each_term = each_term.replace('*', '')
+                        if each_term not in new_terms:
+                            new_terms.append(Term(each_term))
+                # If there are no *s remaining, must be a single term, so add as usual (if not numeric)
+                elif Term(formatted_term) not in new_terms:
+                    new_terms.append(Term(formatted_term))
+            all_rhs_terms.update(new_terms)
 
-            # If term still contains *, means it's a closure term and needs splitting up into individual terms
-            if '*' in str(formatted_term):
-                terms = str(formatted_term).split('*')
-                for each_term in terms:
-                    each_term = each_term.replace('*', '')
-                    if each_term not in new_terms:
-                        new_terms.append(Term(each_term))
-            # If there are no *s remaining, must be a single term, so add as usual (if not numeric)
-            elif formatted_term not in new_terms:
-                new_terms.append(Term(formatted_term))
+    for term in all_rhs_terms:
+        # If term is up to length we're considering and not already in system, add equation for it
+        if (term not in lhs_terms) and (str(term) != '\u3009') and sum(c.isalpha() for c in str(term)) <= length:
+            if (g.number_of_nodes() <= 3) or (not closures) or (closures and not can_be_closed(term, g)):
+                next_equation = sym.Eq(sym.Derivative(term.function()(sym.symbols('t'))),
+                                       chain_rule(term, g, model, closures))
+                if next_equation not in equations:
+                    equations.append(next_equation)
+            elif closures and can_be_closed(term, g):
+                closure_terms = replace_with_closures(term.function(), g)
+                for small_term in closure_terms:
+                    if small_term not in lhs_terms:
+                        next_from_closures = sym.Eq(sym.Function(format_term(str(small_term)))(sym.symbols('t')),
+                                                    chain_rule(Term(format_term(str(small_term))), g, model,
+                                                               closures))
+                        if next_from_closures not in equations:
+                            equations.append(next_from_closures)
 
-        rhs_terms = new_terms
-        for term in rhs_terms:
-            lhs_terms = [each.lhs for each in prev_equations]
-            # If term is up to length we're considering
-            # and not already in system, add equation for it
-            if term not in lhs_terms and str(term) != '\u3009':
-                if sum(c.isalpha() for c in str(term)) <= length:
-                    term_as_function = term.function()
-                    if not closures:
-                        next_equation = sym.Eq(sym.Derivative(term_as_function(sym.symbols('t'))),
-                                               chain_rule(term, graph, model, closures))
-                        if next_equation not in equations:
-                            equations.append(next_equation)
-                    else:
-                        if not can_be_closed(term, graph):
-                            next_equation = sym.Eq(sym.Derivative(term_as_function(sym.symbols('t'))),
-                                                   chain_rule(term, graph, model, closures))
-                            if next_equation not in equations:
-                                equations.append(next_equation)
-                        else:
-                            closure_terms = replace_with_closures(term_as_function, graph)
-                            for small_term in closure_terms:
-                                if small_term not in lhs_terms:
-                                    next_from_closures = sym.Eq(
-                                        sym.Function(format_term(str(small_term)))(sym.symbols('t')),
-                                        chain_rule(Term(format_term(str(small_term))), graph, model, closures))
-                                    if next_from_closures not in equations:
-                                        equations.append(next_from_closures)
-
-        # Increase length we are interested in by 1 and recur if length < num vertices in graph
-    if length + 1 <= graph.number_of_nodes():
-        next_equations = generate_equations(graph, model, length + 1, closures, equations)
-        for eqn in next_equations:
-            if eqn not in equations:
-                equations.append(eqn)
+    # Increase length we are interested in by 1 and recur if length < num vertices in graph
+    if length + 1 <= g.number_of_nodes():
+        equations = generate_equations(g, model, length + 1, closures, equations)
     return equations
 
 
@@ -137,13 +127,15 @@ def format_term(formatted_term):
     return formatted_term
 
 
-def add_terms(v: Vertex, term: Term, transition: tuple, neighbours_of_v: list):
+def add_terms(v: Vertex, term: Term, transition: tuple, model: CModel, neighbours_of_v: list):
     term_clone = copy.deepcopy(term)  # make sure we don't amend the original term
     neighbours_of_v_not_in_tuple = list(set(neighbours_of_v) - set(term_clone.node_list()))
+    neighbours_of_v_in_tuple = list(set(term_clone.vertices) - {v})
     terms = []
     if transition[0] == Coupling.NEIGHBOUR_ENTER:
         # e.g. v is in state I, so change v to S and each neighbour in turn to I
         other_state_for_v = transition[1][0]  # the state v would be in before transitioning to current state
+        # First, look at all external vertices that could lead to entering this state
         for n in neighbours_of_v_not_in_tuple:
             # Make sure new term contains all same terms as original
             vertices = set(term_clone.vertices)
@@ -151,6 +143,12 @@ def add_terms(v: Vertex, term: Term, transition: tuple, neighbours_of_v: list):
             # Add the neighbour in the transition-inducing state
             vertices.add(Vertex(v.state, n))
             terms.append(transition[2] * Term(list(vertices)).function()(sym.symbols('t')))
+        # Now, try to find any neighbours in the tuple that could lead to this state
+        for n in neighbours_of_v_in_tuple:
+            if coupling_types(model)[n.state][0][0] == Coupling.NEIGHBOUR_ENTER:
+                vertices = set(term_clone.vertices)
+                vertices.update({Vertex(other_state_for_v, v.node), n})
+                terms.append(coupling_types(model)[n.state][0][2] * Term(list(vertices)).function()(sym.symbols('t')))
     elif transition[0] == Coupling.NEIGHBOUR_EXIT:
         # e.g. v in state S so can exit if any neighbour in I
         other_state_for_neighbours = transition[1].split('*')[1][0]
@@ -159,6 +157,11 @@ def add_terms(v: Vertex, term: Term, transition: tuple, neighbours_of_v: list):
             vertices.add(v)
             vertices.add(Vertex(other_state_for_neighbours, n))
             terms.append(-transition[2] * Term(list(vertices)).function()(sym.symbols('t')))
+        for n in neighbours_of_v_in_tuple:
+            if coupling_types(model)[n.state][0][0] == Coupling.NEIGHBOUR_ENTER:
+                vertices = set(term_clone.vertices)
+                vertices.update({n, v})
+                terms.append(-coupling_types(model)[n.state][0][2] * Term(list(vertices)).function()(sym.symbols('t')))
     elif transition[0] == Coupling.ISOLATED_ENTER:
         # e.g. v in state R, gets there through recovery after being in i
         other_state_for_v = transition[1][0]
@@ -183,7 +186,7 @@ def derive(v: Vertex, term_without_v: Term, g: Graph, model: CModel, closures=Fa
     transitions = coupling_types(model)
     all_terms = 0
     for transition in transitions[v.state]:
-        terms = add_terms(v, term_without_v, transition, neighbours_of_v)
+        terms = add_terms(v, term_without_v, transition, model, neighbours_of_v)
         for each_term in terms:
             if not closures:
                 all_terms += each_term
@@ -213,7 +216,7 @@ def chain_rule(term: Term, graph: Graph, model: CModel, closures=False):
     all_terms = 0
     for v in list(term_clone.vertices):
         term_clone.remove(v)
-        terms = derive(v, term_clone, copy.deepcopy(graph), model, closures)
+        terms = derive(v, term_clone, graph, model, closures)
         all_terms += terms
         term_clone.add(v)
     return all_terms

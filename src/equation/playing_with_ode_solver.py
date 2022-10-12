@@ -1,5 +1,9 @@
+import networkx as nx
 import sympy as sym
 import matplotlib
+
+from equation import generate_equations, get_SIR
+
 matplotlib.use('TkAgg')  # Stops an annoying bug
 
 
@@ -32,29 +36,7 @@ def main():
     I1S2I3 = sym.Function('I1 S2 I3')
 
     print('setting up equations...')
-
-    triangle_equations = [
-        sym.Eq(sym.Derivative(S1(t)), -tau * S1I2(t) - tau * S1I3(t)),
-        sym.Eq(sym.Derivative(S2(t)), -tau * I1S2(t) - tau * S2I3(t)),
-        sym.Eq(sym.Derivative(S3(t)), -tau * I2S3(t) - tau * I1S3(t)),
-        sym.Eq(sym.Derivative(I1(t)), tau * S1I2(t) + tau * S1I3(t) - gamma * I1(t)),
-        sym.Eq(sym.Derivative(I2(t)), tau * I1S2(t) + tau * S2I3(t) - gamma * I2(t)),
-        sym.Eq(sym.Derivative(I3(t)), tau * I2S3(t) + tau * I1S3(t) - gamma * I3(t)),
-
-        sym.Eq(sym.Derivative(I1S2(t)), -(tau + gamma) * I1S2(t) - tau * I1S2I3(t) + tau * S1S2I3(t)),
-        sym.Eq(sym.Derivative(S1I2(t)), -(tau + gamma) * S1I2(t) + tau * S1S2I3(t) - tau * S1I2I3(t)),
-        sym.Eq(sym.Derivative(I2S3(t)), -(tau + gamma) * I2S3(t) + tau * I1S2S3(t) - tau * I1I2S3(t)),
-        sym.Eq(sym.Derivative(S2I3(t)), -(tau + gamma) * S2I3(t) - tau * I1S2I3(t) + tau * I1S2S3(t)),
-        sym.Eq(sym.Derivative(I1S3(t)), -(tau + gamma) * I1S3(t) - tau * I1I2S3(t) + tau * S1I2S3(t)),
-        sym.Eq(sym.Derivative(S1I3(t)), -(tau + gamma) * S1I3(t) - tau * S1I2I3(t) + tau * S1I2S3(t)),
-
-        sym.Eq(sym.Derivative(I1S2I3(t)), -2 * (tau + gamma) * I1S2I3(t) + tau * I1S2S3(t) + tau * S1S2I3(t)),
-        sym.Eq(sym.Derivative(S1I2I3(t)), -2 * (tau + gamma) * S1I2I3(t) + tau * S1S2I3(t) + tau * S1I2S3(t)),
-        sym.Eq(sym.Derivative(I1I2S3(t)), -2 * (tau + gamma) * I1I2S3(t) + tau * I1S2S3(t) + tau * S1I2S3(t)),
-        sym.Eq(sym.Derivative(S1I2S3(t)), -2 * (tau + gamma) * S1I2S3(t)),
-        sym.Eq(sym.Derivative(S1S2I3(t)), -2 * (tau + gamma) * S1S2I3(t)),
-        sym.Eq(sym.Derivative(I1S2S3(t)), -2 * (tau + gamma) * I1S2S3(t))
-    ]
+    triangle_generated = generate_equations(nx.cycle_graph(3), get_SIR())
 
     functions = [S1(t), S2(t), S3(t), I1(t), I2(t), I3(t),
                  S1I2(t), I1S2(t), S1I3(t), I1S3(t), S2I3(t), I2S3(t),
@@ -78,7 +60,8 @@ def main():
     IV[I1S2I3(0)] = IV[I1(0)] * IV[S2(0)] * IV[I3(0)]
 
     print('passing equations and I.C.s into solver...')
-    sol = sym.solvers.ode.systems.dsolve_system(eqs=triangle_equations, funcs=functions, t=t, ics=IV)
+    sol = sym.solvers.ode.systems.dsolve_system(eqs=triangle_generated, funcs=functions,
+                                                t=t, ics=IV)
     print('solved!')
 
     t_range = (t, 0, 25)
