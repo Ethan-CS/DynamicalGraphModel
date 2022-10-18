@@ -52,3 +52,10 @@ def test_num_eqn_path():
         closed_equations = generate_equations(copy.deepcopy(path), SIR, closures=True)
         assert len(closed_equations) == actual_with_closures, f'expected\n{actual_with_closures}, ' \
                                                               f'got\n{[each.lhs for each in closed_equations]}'
+
+
+def run_all():
+    test_can_be_closed()
+    test_num_eqn_lollipop()
+    test_num_eqn_path()
+

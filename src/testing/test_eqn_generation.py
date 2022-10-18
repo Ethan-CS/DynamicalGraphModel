@@ -57,14 +57,14 @@ def test_get_single_equations():
 def test_path_equations():
     for i in range(1, 10):
         path = networkx.path_graph(i)
-        equations = eqn_generation.generate_equations(path, SIR)
-        closed_equations = eqn_generation.generate_equations(path, SIR, closures=True)
+        equations = generation.generate_equations(path, SIR)
+        closed_equations = generation.generate_equations(path, SIR, closures=True)
 
         assert len(equations) == int((3 * i * i - i + 2) / 2), f'incorrect number of equations for full system for ' \
                                                                f'path on {i} vertices'
         if i > 3:
             assert len(closed_equations) == 5 * i - 3, 'incorrect number of equations for closed system for ' \
-                                                       f'path on {i} vertices:\n{[each.lhs for each in closed_equations]}'
+                                                       f'path on {i}\n{[each.lhs for each in closed_equations]}'
 
 
 def test_triangle_equations():
@@ -102,3 +102,9 @@ def test_triangle_equations():
         assert t_actual in triangle_equations_generated, 'generated equations missing this equation:' + str(t_actual)
     for t_generated in triangle_equations_generated:
         assert t_generated in triangle_equations_actual, 'generated equations has an extra equation:' + str(t_generated)
+
+
+def run_all():
+    test_get_single_equations()
+    test_path_equations()
+    test_triangle_equations()
