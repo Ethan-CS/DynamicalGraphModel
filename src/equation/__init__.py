@@ -1,13 +1,12 @@
+import sys
 from datetime import datetime
 
 import networkx
-import pandas as pd
-import sympy as sym
 
-from equation import eqn_generation, closures
+from equation import generation, closing
 from equation.Term import Term, Vertex
-from equation.eqn_generation import get_single_equations, generate_equations
-from equation.eqn_solving import initial_conditions
+from equation.generation import get_single_equations, generate_equations
+from equation.solving import initial_conditions, solve_equations
 from model_params.cmodel import CModel
 
 SIR = CModel('SIR')
@@ -20,43 +19,40 @@ def get_SIR():
 
 
 def main():
-    # full_results = {}
-    # closed_results = {}
-    # num_eqns = {}
-    # for i in range(1, 11):
-    #     full_results[i] = []
-    #     closed_results[i] = []
-    #     num_eqns[i] = {'full': int((3 * i * i - i + 2) / 2), 'closed': 5 * i - 3}
-    #
-    #     path = networkx.path_graph(i)
-    #     init_conditions = initial_conditions(path.nodes)
-    #     for _ in range(0, 10):
-    #         full_start = datetime.now()
-    #         full_equations = eqn_generation.generate_equations(path, SIR)
-    #         assert len(full_equations) == int((3 * i * i - i + 2) / 2)
-    #         full_time_taken = datetime.now() - full_start
-    #
-    #         closed_start = datetime.now()
-    #         closed_equations = eqn_generation.generate_equations(path, SIR, closures=True)
-    #         if i > 3:
-    #             assert len(closed_equations) == (5 * i - 3), 'something wrong with this set of equations:\n' + \
-    #                                                          str([str(eq.lhs) for eq in closed_equations])
-    #         closed_time_taken = datetime.now() - closed_start
-    #         print(
-    #             f'{i},{len(full_equations)},{full_time_taken.seconds}.{full_time_taken.microseconds},'
-    #             f'{len(closed_equations)},{closed_time_taken.seconds}.{closed_time_taken.microseconds}')
-    #
-    #         full_results[i].append(full_time_taken)
-    #         closed_results[i].append(closed_time_taken)
-    #
-    # full_data = pd.DataFrame(full_results)
-    # print(full_data)
-    # closed_data = pd.DataFrame(closed_results)
-    # print(closed_data)
-    path = networkx.path_graph(5)
-    closed_equations = eqn_generation.generate_equations(path, SIR, closures=False)
-    for eq in closed_equations:
-        print(eq)
+    for g in ['path', 'cycle', 'tree']:
+        print(f'generating equations for {g}')
+        original_stdout = sys.stdout  # Save a reference to the original standard output
+        with open(f'data/{g}_data.csv', 'w') as f:
+            sys.stdout = f  # Change the standard output to the file we created.
+            print('number of vertices,number equations (full),time (full),num equations (closed),time (closed)')
+            sys.stdout = original_stdout  # Reset the standard output to its original value
+            for i in range(1, 25):
+                print(f'i={i}')
+                for _ in range(0, 10):
+                    print(f'iter {_+1} of 10')
+                    if g == 'path':
+                        graph = networkx.path_graph(i)
+                    elif g == 'cycle':
+                        graph = networkx.cycle_graph(i)
+                    else:
+                        graph = networkx.random_tree(i)
+
+                    init_conditions = initial_conditions(list(graph.nodes))
+
+                    full_start = datetime.now()
+                    full_equations = eqn_generation.generate_equations(graph, SIR)
+                    solve_equations(full_equations, init_conditions)
+                    full_time_taken = datetime.now() - full_start
+
+                    closed_start = datetime.now()
+                    closed_equations = eqn_generation.generate_equations(graph, SIR, closures=True)
+                    solve_equations(closed_equations, init_conditions)
+                    closed_time_taken = datetime.now() - closed_start
+
+                    sys.stdout = f  # Change the standard output to the file we created.
+                    print(f'{i},{len(full_equations)},{full_time_taken.seconds}.{full_time_taken.microseconds},'
+                          f'{len(closed_equations)},{closed_time_taken.seconds}.{closed_time_taken.microseconds}')
+                    sys.stdout = original_stdout  # Reset the standard output to its original value
 
 
 if __name__ == '__main__':

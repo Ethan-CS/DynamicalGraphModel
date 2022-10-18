@@ -1,11 +1,11 @@
 import networkx
 import sympy as sym
 
-from equation import eqn_generation
+from equation import generation
 from equation.Term import Vertex, Term
 import networkx as nx
 
-from equation.eqn_generation import get_single_equations, generate_equations
+from equation.generation import get_single_equations, generate_equations
 from model_params.cmodel import CModel
 
 tau, gamma = 1, 0.1

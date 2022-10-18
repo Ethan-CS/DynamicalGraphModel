@@ -5,7 +5,7 @@ import numpy as np
 
 from equation import generate_equations
 from equation.Term import Term, Vertex
-from equation.closures import can_be_closed
+from equation.closing import can_be_closed
 from model_params.cmodel import CModel
 
 SIR = CModel('SIR')
