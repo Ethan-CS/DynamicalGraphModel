@@ -2,6 +2,7 @@ import copy
 import re
 
 import networkx
+import networkx as nx
 import sympy as sym
 from networkx import Graph
 
@@ -24,11 +25,10 @@ def get_single_equations(g, model):
     :param model: A specified compartmental model
     :return: The list of single-vertex tuples for which we require equations
     """
-    singles_terms, singles_equations = [], []
+    singles_equations = []
     for state in dynamically_relevant(model):
         for node in g.nodes:
             term = Term([Vertex(state, node)])
-            singles_terms.append(term)
             singles_equations.append(sym.Eq(sym.Derivative(sym.Function(str(term))(t)), chain_rule(term, g, model)))
 
     return singles_equations
@@ -56,6 +56,9 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
    -------
    A dictionary containing the LHS terms mapped to the terms on the RHS
    """
+    if closures:
+        if len(list(nx.articulation_points(g))) == 0:
+            closures = False
     # If no prev equations provided, get the base case (singles equations)
     if prev_equations is None:
         prev_equations = get_single_equations(g, model)
@@ -69,18 +72,15 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
         LHS = str(eq.lhs).replace('Derivative', '').replace('(', '').replace(')', '').replace('\u3008', '') \
             .replace('\u3009', '').replace('t', '').replace(',', '')
         if len(LHS.split(' ')) == length:
-            rhs_terms = list(eq.rhs.args)
             new_terms = list()
             # Pre-formatting - ignore coefficients
-            for term in rhs_terms:
+            for term in list(eq.rhs.args):
                 try:
                     float(term)  # if this works, it's just a coefficient, so ignore it
                     continue
                 except TypeError:
                     pass
-                formatted_term = str(term).replace('(t)', '').replace('-', '') \
-                    .replace('\u3008', '').replace('\u3009', '').replace(' ', '')
-                formatted_term = format_term(formatted_term)
+                formatted_term = format_term(str(term))
 
                 # If term still contains *, means it's a closure term and needs splitting up into individual terms
                 if '*' in str(formatted_term):
@@ -89,28 +89,27 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
                         each_term = each_term.replace('*', '')
                         if each_term not in new_terms:
                             new_terms.append(Term(each_term))
-                # If there are no *s remaining, must be a single term, so add as usual (if not numeric)
                 elif Term(formatted_term) not in new_terms:
                     new_terms.append(Term(formatted_term))
             all_rhs_terms.update(new_terms)
 
     for term in all_rhs_terms:
         # If term is up to length we're considering and not already in system, add equation for it
-        if (term not in lhs_terms) and (str(term) != '\u3009') and sum(c.isalpha() for c in str(term)) <= length:
-            if (g.number_of_nodes() <= 3) or (not closures) or (closures and not can_be_closed(term, g)):
+        if (term not in lhs_terms) and sum(c.isalpha() for c in str(term)) <= length:
+            if not closures or (closures and not can_be_closed(term, g)):
                 next_equation = sym.Eq(sym.Derivative(term.function()(sym.symbols('t'))),
                                        chain_rule(term, g, model, closures))
                 if next_equation not in equations:
                     equations.append(next_equation)
             elif closures and can_be_closed(term, g):
                 closure_terms = replace_with_closures(term.function(), g)
-                for small_term in closure_terms:
-                    if small_term not in lhs_terms:
-                        next_from_closures = sym.Eq(sym.Function(format_term(str(small_term)))(sym.symbols('t')),
-                                                    chain_rule(Term(format_term(str(small_term))), g, model,
+                for sub_term in closure_terms:
+                    if sub_term not in lhs_terms:
+                        next_from_closures = sym.Eq(sym.Function(format_term(str(sub_term)))(sym.symbols('t')),
+                                                    chain_rule(Term(format_term(str(sub_term))), g, model,
                                                                closures))
-                        if next_from_closures not in equations:
-                            equations.append(next_from_closures)
+                        # if next_from_closures not in equations:
+                        equations.append(next_from_closures)
 
     # Increase length we are interested in by 1 and recur if length < num vertices in graph
     if length + 1 <= g.number_of_nodes():
@@ -119,6 +118,7 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
 
 
 def format_term(formatted_term):
+    formatted_term = re.sub("[-.+\u3008\u3009(t)]", "", str(formatted_term))
     if '*' in str(formatted_term):
         formatted_term = list(str(formatted_term).split('*', 1))[1]
     # Replace / in closures with *, as we deal with them the same later

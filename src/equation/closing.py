@@ -31,28 +31,26 @@ def find_cut_vertices(graph: Graph):
     return cuts
 
 
-def can_be_closed(term: Term, graph: Graph):
-    """
-    Returns true if the specified term can be closed (i.e. contains a cut-vertex) and false otherwise.
-    """
-    if len(term.vertices) < 3:
-        return False
-    return len(list(nx.articulation_points(nx.subgraph(graph, term.node_list())))) != 0
+# True if the specified term can be closed (i.e. contains a cut-vertex), false otherwise
+def can_be_closed(term: Term, g: Graph):
+    return False if len(term.vertices) < 3 else len(list(nx.articulation_points(nx.subgraph(g, term.node_list())))) != 0
 
 
 def replace_with_closures(term: Term, graph: Graph):
     if type(term) == sym.Symbol or sym.Function:
         term = Term(str(term))
 
-    sub_terms = []
+    # We work on the subgraph induced by the vertices in the term
     induced_subgraph = Graph(nx.subgraph(copy.deepcopy(graph), list(term.node_list())))
-    cut_vertices = list(nx.articulation_points(induced_subgraph))
-    cut = cut_vertices[0]
-    sub_terms.append(1/sym.Symbol(str(Vertex('S', cut))))
+    # Find cut-vertices in induced subgraph and arbitrarily select first in list
+    # If there are several, they are identified later on and same procedure followed to replace
+    cut = list(nx.articulation_points(induced_subgraph))[0]
     induced_subgraph.remove_node(cut)
-    cc = list(nx.connected_components(induced_subgraph))
-    graph_components = []
-    for c in cc:
+
+    sub_terms = [1 / sym.Symbol(str(Vertex('S', cut)))]  # Will contain all terms to replace original with
+
+    graph_components = []  # List of the connected components after cut-vertex removal with CV replaced in each
+    for c in list(nx.connected_components(induced_subgraph)):
         c.add(cut)
         graph_components.append(c)
 
@@ -61,11 +59,12 @@ def replace_with_closures(term: Term, graph: Graph):
         original_states[vertex.node] = vertex.state
 
     for component in graph_components:
-        as_vertices = []
-        for v in component:
-            as_vertices.append(Vertex(original_states[v], v))
+        as_vertices = [Vertex(original_states[v], v) for v in component]
         if not can_be_closed(Term(list(as_vertices)), graph):
+            # Cannot be closed further, add to list of substitutions and continue
             sub_terms.append(sym.Symbol(str(Term(as_vertices))))
         else:
-            replace_with_closures(Term(as_vertices), graph)
+            # There are remaining cut-vertices in the term, so close the term on those too
+            sub_terms.append(replace_with_closures(Term(as_vertices), graph))
+
     return sub_terms
