@@ -1,62 +1,25 @@
-import sys
-from datetime import datetime
-
 import networkx
 
 from equation import generation, closing
 from equation.Term import Term, Vertex
 from equation.generation import get_single_equations, generate_equations
 from equation.solving import initial_conditions, solve_equations
-from model_params.cmodel import CModel
-
-SIR = CModel('SIR')
-SIR.set_coupling_rate('S*I:S=>I', 1, name='beta')  # Infection rate
-SIR.set_coupling_rate('I:I=>R', 3, name='gamma')  # Recovery rate
-
-
-def get_SIR():
-    return SIR
+from equation_MC_comparison import measure_generation_runtimes
 
 
 def main():
-    for g in ['cycle']:
-        print(f'generating equations for {g}')
-        timeout = 60
-        original_stdout = sys.stdout  # Save a reference to the original standard output
-        with open(f'data/{g}_data.csv', 'w') as f:
-            sys.stdout = f  # Change the standard output to the file we created.
-            print('number of vertices,number equations (full),time (full),num equations (closed),time (closed)')
-            sys.stdout = original_stdout  # Reset the standard output to its original value
-            for i in range(1, 11):
-                print(f'i={i}')
-                for _ in range(0, 10):
-                    print(f'iter {_+1} of 10')
-                    if g == 'path':
-                        graph = networkx.path_graph(i)
-                    elif g == 'cycle':
-                        graph = networkx.cycle_graph(i)
-                    else:
-                        graph = networkx.random_tree(i)
-
-                    init_conditions = initial_conditions(list(graph.nodes))
-                    full_start = datetime.now()
-                    while (datetime.now()-full_start).seconds < timeout:
-                        full_equations = generate_equations(graph, SIR)
-                        # solve_equations(full_equations, init_conditions)
-                        full_time_taken = datetime.now() - full_start
-                        break
-
-                    closed_start = datetime.now()
-                    while (datetime.now()-closed_start).seconds < timeout:
-                        closed_equations = generate_equations(graph, SIR, closures=True)
-                        # solve_equations(closed_equations, init_conditions)
-                        closed_time_taken = datetime.now() - closed_start
-                        break
-
-                    sys.stdout = f  # Change the standard output to the file we created.
-                    print(f'{i},{len(full_equations)},{full_time_taken.seconds}.{full_time_taken.microseconds},'
-                          f'{len(closed_equations)},{closed_time_taken.seconds}.{closed_time_taken.microseconds}')
-                    sys.stdout = original_stdout  # Reset the standard output to its original value
+    with open(f'data/path_data.csv', 'w') as f:
+        for i in range(1, 11):
+            print(f'i={i}')
+            measure_generation_runtimes(g=networkx.path_graph(i), num_iter=10, timeout=100, f=f)
+    with open(f'data/random_tree_data.csv', 'w') as f:
+        for i in range(1, 11):
+            print(f'i={i}')
+            measure_generation_runtimes(g=networkx.random_tree(i), num_iter=10, timeout=100, f=f)
+    with open(f'data/cycle_data.csv', 'w') as f:
+        for i in range(1, 11):
+            print(f'i={i}')
+            measure_generation_runtimes(g=networkx.cycle_graph(i), num_iter=10, timeout=100, f=f)
 
 
 if __name__ == '__main__':

@@ -16,8 +16,7 @@ t = sym.symbols('t')
 
 def get_single_equations(g, model):
     """
-    Given a contact graph and a compartmental model, returns the list of tuples containing only one vertex for which we
-    require equations in the dynamical system. These equations are used as the base case for equation generation.
+    Returns the equations for single-vertices being in single (dynamically relevant) states.
 
     :type g: networkx.Graph
     :type model: CModel
@@ -67,10 +66,36 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
     # Start with previous equations as base case and add to that list
     equations = list(prev_equations)
     # Look through RHS terms of previous equations and add eqn for any terms that don't have one yet
+    all_rhs_terms = get_rhs_terms(equations, length)
+
+    for term in all_rhs_terms:
+        # If term is up to length we're considering and not already in system, add equation for it
+        if (term not in lhs_terms) and sum(c.isalpha() for c in str(term)) <= length:
+            if not closures or (closures and not can_be_closed(term, g)):
+                next_equation = sym.Eq(sym.Derivative(term.function()(sym.symbols('t'))),
+                                       chain_rule(term, g, model, closures))
+                if next_equation not in equations:
+                    equations.append(next_equation)
+            elif closures and can_be_closed(term, g):
+                closure_terms = replace_with_closures(term.function(), g)
+                for sub_term in closure_terms:
+                    if sub_term not in lhs_terms:
+                        next_from_closures = sym.Eq(sym.Function(format_term(str(sub_term)))(sym.symbols('t')),
+                                                    chain_rule(Term(format_term(str(sub_term))), g, model,
+                                                               closures))
+                        # if next_from_closures not in equations:
+                        equations.append(next_from_closures)
+
+    # Increase length we are interested in by 1 and recur if length < num vertices in graph
+    if length + 1 <= g.number_of_nodes()+1:
+        equations = generate_equations(g, model, length + 1, closures, equations)
+    return equations
+
+
+def get_rhs_terms(equations, length):
     all_rhs_terms = set()
     for eq in equations:
-        LHS = str(eq.lhs).replace('Derivative', '').replace('(', '').replace(')', '').replace('\u3008', '') \
-            .replace('\u3009', '').replace('t', '').replace(',', '')
+        LHS = get_eq_lhs(eq)
         if len(LHS.split(' ')) == length:
             new_terms = list()
             # Pre-formatting - ignore coefficients
@@ -92,29 +117,12 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
                 elif Term(formatted_term) not in new_terms:
                     new_terms.append(Term(formatted_term))
             all_rhs_terms.update(new_terms)
+    return all_rhs_terms
 
-    for term in all_rhs_terms:
-        # If term is up to length we're considering and not already in system, add equation for it
-        if (term not in lhs_terms) and sum(c.isalpha() for c in str(term)) <= length:
-            if not closures or (closures and not can_be_closed(term, g)):
-                next_equation = sym.Eq(sym.Derivative(term.function()(sym.symbols('t'))),
-                                       chain_rule(term, g, model, closures))
-                if next_equation not in equations:
-                    equations.append(next_equation)
-            elif closures and can_be_closed(term, g):
-                closure_terms = replace_with_closures(term.function(), g)
-                for sub_term in closure_terms:
-                    if sub_term not in lhs_terms:
-                        next_from_closures = sym.Eq(sym.Function(format_term(str(sub_term)))(sym.symbols('t')),
-                                                    chain_rule(Term(format_term(str(sub_term))), g, model,
-                                                               closures))
-                        # if next_from_closures not in equations:
-                        equations.append(next_from_closures)
 
-    # Increase length we are interested in by 1 and recur if length < num vertices in graph
-    if length + 1 <= g.number_of_nodes():
-        equations = generate_equations(g, model, length + 1, closures, equations)
-    return equations
+def get_eq_lhs(eq):
+    return str(eq.lhs).replace('Derivative', '').replace('(', '').replace(')', '').replace('\u3008', '') \
+        .replace('\u3009', '').replace('t', '').replace(',', '')
 
 
 def format_term(formatted_term):

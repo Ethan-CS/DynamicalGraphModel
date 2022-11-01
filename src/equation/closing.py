@@ -33,7 +33,12 @@ def find_cut_vertices(graph: Graph):
 
 # True if the specified term can be closed (i.e. contains a cut-vertex), false otherwise
 def can_be_closed(term: Term, g: Graph):
-    return False if len(term.vertices) < 3 else len(list(nx.articulation_points(nx.subgraph(g, term.node_list())))) != 0
+    if len(term.vertices) < 3:
+        return False
+    else:
+        subgraph = nx.subgraph(g, term.node_list())
+        # TODO check the cut-vertex in this term is in the list of cut-vertices of the graph
+        return len(list(nx.articulation_points(subgraph))) > 0 and len(list(nx.articulation_points(g))) > 0
 
 
 def replace_with_closures(term: Term, graph: Graph):
