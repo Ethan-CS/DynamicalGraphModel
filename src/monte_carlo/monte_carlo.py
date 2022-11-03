@@ -36,4 +36,4 @@ def example_monte_carlo():
     print('result:', monte_carlo_sim(tree, SIR, initial_state, 10))
 
 
-example_monte_carlo()
+# example_monte_carlo()

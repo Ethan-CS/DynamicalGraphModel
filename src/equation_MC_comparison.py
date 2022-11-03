@@ -98,6 +98,6 @@ def get_functions_from_equations(equations, symbol=sym.symbols('t')):
     # # print(solution)
 
 
-all_equations = generate_equations(nx.path_graph(5), get_SIR(), closures=True)
-functions = get_functions_from_equations(all_equations, sym.symbols('t'))
-print(functions)
+# all_equations = generate_equations(nx.path_graph(5), get_SIR(), closures=True)
+# functions = get_functions_from_equations(all_equations, sym.symbols('t'))
+# print(functions)

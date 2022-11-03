@@ -721,8 +721,3 @@ class CModel(object):
         lv.set_coupling_rate('P:P=>', delta, 'delta')
 
         return lv
-
-
-SIR = CModel('SIR')
-SIR.set_coupling_rate('S*I:S=>I', 1, name='beta')  # Infection rate
-SIR.set_coupling_rate('I:I=>R', 3, name='gamma')   # Recovery rate

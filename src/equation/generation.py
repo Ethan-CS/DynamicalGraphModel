@@ -88,6 +88,8 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
 
     # Increase length we are interested in by 1 and recur if length < num vertices in graph
     if length + 1 <= g.number_of_nodes()+1:
+        # TODO something wrong with the stopping condition, there are some terms in last few equations
+        #  that do not seem to get equations of their own in the system
         equations = generate_equations(g, model, length + 1, closures, equations)
     return equations
 
