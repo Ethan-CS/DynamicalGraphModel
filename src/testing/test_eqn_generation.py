@@ -6,13 +6,11 @@ from equation.Term import Vertex, Term
 import networkx as nx
 
 from equation.generation import get_single_equations, generate_equations
-from model_params.cmodel import CModel
+from model_params.cmodel import get_SIR
 
 tau, gamma = 1, 0.1
 
-SIR = CModel('SIR')
-SIR.set_coupling_rate('S*I:S=>I', tau, name='beta')  # Infection rate
-SIR.set_coupling_rate('I:I=>R', gamma, name='gamma')  # Recovery rate
+SIR = get_SIR(tau, gamma)
 
 t = sym.symbols('t')
 

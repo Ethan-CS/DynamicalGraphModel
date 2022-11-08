@@ -11,9 +11,6 @@ def main():
     # Equations for the triangle network
     t = sym.symbols('t')
 
-    tau = 0.3
-    gamma = 0.1
-
     S1 = sym.Function('S1')
     S2 = sym.Function('S2')
     S3 = sym.Function('S3')

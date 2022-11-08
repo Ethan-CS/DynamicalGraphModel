@@ -6,11 +6,9 @@ import numpy as np
 from equation import generate_equations
 from equation.Term import Term, Vertex
 from equation.closing import can_be_closed
-from model_params.cmodel import CModel
+from model_params.cmodel import get_SIR
 
-SIR = CModel('SIR')
-SIR.set_coupling_rate('S*I:S=>I', 1, name='beta')  # Infection rate
-SIR.set_coupling_rate('I:I=>R', 3, name='gamma')  # Recovery rate
+SIR = get_SIR()
 
 
 def test_can_be_closed():

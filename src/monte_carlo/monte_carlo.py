@@ -1,7 +1,12 @@
+from time import time
+
 import networkx as nx
 import numpy as np
+import sympy as sym
 
-from model_params.cmodel import CModel
+from equation import generate_equations
+from equation.testing_numerical_solvers import solve
+from model_params.cmodel import CModel, get_SIR
 
 
 def monte_carlo_sim(graph: nx.Graph, model: CModel, init_state: dict, t_max: int):
@@ -24,16 +29,51 @@ def monte_carlo_sim(graph: nx.Graph, model: CModel, init_state: dict, t_max: int
 
 def example_monte_carlo():
     tree = nx.random_tree(10)
-    SIR = CModel('SIR')
-    SIR.set_coupling_rate('S*I:S=>I', 0.6, name='beta')  # Infection rate
-    SIR.set_coupling_rate('I:I=>R', 0.15, name='gamma')  # Recovery rate
+    SIR = get_SIR(0.8, 0.1)
+    initial_state = set_initial_state(SIR, tree)
+    print(initial_state)
+    print('result:\n', monte_carlo_sim(tree, SIR, initial_state, 5))
+
+
+def set_initial_state(model, tree):
     initial_state = dict()
-    print(str(SIR.states))
+    print(str(model.states))
     for node in tree.nodes:
         initial_state[node] = 'S'
     initial_state[np.random.choice(tree.nodes)] = 'I'
-    print(initial_state)
-    print('result:', monte_carlo_sim(tree, SIR, initial_state, 10))
+    return initial_state
 
 
-# example_monte_carlo()
+def run_to_average(graph, model, init_state, t_max, solution, tolerance, timeout=60):
+    solution_range = [range(s * (1 - tolerance), s * (1 + tolerance)) for s in solution]
+    averages = []
+    start = time()
+    while True:
+        averages.append(monte_carlo_sim(graph, model, init_state, t_max))
+        avg = [sum(a) / len(a) for a in zip(*averages)]
+        within = True
+        for i in range(len(avg)):
+            if avg[i] not in solution_range[i]:
+                within = False
+                break
+        if within:
+            print(f'succeeded in {time() - start}s')
+            break
+        if time() - start >= timeout:
+            print('timeout!')
+
+
+def try_run_to_avg():
+    tree = nx.random_tree(10)
+    SIR = get_SIR()
+    initial_state = set_initial_state(SIR, tree)
+    equations = generate_equations(tree, SIR)
+    with open('equations.txt', 'w') as f:
+        for e in equations:
+            f.write(f'{sym.Integral(e.lhs).doit()}\' = {e.rhs}\n')
+    solution = solve(equations, tree)
+    print(solution)
+    run_to_average(tree, SIR, initial_state, 10, solution, 0.05, 60)
+
+
+# try_run_to_avg()

@@ -8,10 +8,10 @@ from numba import jit
 FitResult = namedtuple('FitResult', ['C', 'y0', 'R2', 'MRPD', 'success'])
 
 
-def get_SIR():
+def get_SIR(beta=1, gamma=3):
     sir_model = CModel('SIR')
-    sir_model.set_coupling_rate('S*I:S=>I', 1, name='beta')  # Infection rate
-    sir_model.set_coupling_rate('I:I=>R', 3, name='gamma')  # Recovery rate
+    sir_model.set_coupling_rate('S*I:S=>I', beta, name='beta')  # Infection rate
+    sir_model.set_coupling_rate('I:I=>R', gamma, name='gamma')  # Recovery rate
     return sir_model
 
 

@@ -24,12 +24,12 @@ def get_single_equations(g, model):
     :param model: A specified compartmental model
     :return: The list of single-vertex tuples for which we require equations
     """
-    singles_equations = []
+    singles_equations = {1: []}
     for state in dynamically_relevant(model):
         for node in g.nodes:
             term = Term([Vertex(state, node)])
-            singles_equations.append(sym.Eq(sym.Derivative(sym.Function(str(term))(t)), chain_rule(term, g, model)))
-
+            singles_equations[1].append(sym.Eq(sym.Derivative(sym.Function(str(term))(t)), chain_rule(term, g, model)))
+    singles_equations[2] = []
     return singles_equations
 
 
@@ -62,63 +62,43 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
     if prev_equations is None:
         prev_equations = get_single_equations(g, model)
     # Get a list of the terms on LHS of previous equations
-    lhs_terms = [each.lhs for each in prev_equations]
+    lhs_terms = [each.lhs for each in prev_equations[length-1]]
     # Start with previous equations as base case and add to that list
-    equations = list(prev_equations)
+    equations = dict(prev_equations)
+    equations[length] = []
     # Look through RHS terms of previous equations and add eqn for any terms that don't have one yet
-    all_rhs_terms = get_rhs_terms(equations, length)
-
-    for term in all_rhs_terms:
+    for term in get_rhs_terms(equations, length, lhs_terms):
         # If term is up to length we're considering and not already in system, add equation for it
-        if (term not in lhs_terms) and sum(c.isalpha() for c in str(term)) <= length:
-            if not closures or (closures and not can_be_closed(term, g)):
-                next_equation = sym.Eq(sym.Derivative(term.function()(sym.symbols('t'))),
-                                       chain_rule(term, g, model, closures))
-                if next_equation not in equations:
-                    equations.append(next_equation)
-            elif closures and can_be_closed(term, g):
-                closure_terms = replace_with_closures(term.function(), g)
-                for sub_term in closure_terms:
-                    if sub_term not in lhs_terms:
-                        next_from_closures = sym.Eq(sym.Function(format_term(str(sub_term)))(sym.symbols('t')),
-                                                    chain_rule(Term(format_term(str(sub_term))), g, model,
-                                                               closures))
-                        # if next_from_closures not in equations:
-                        equations.append(next_from_closures)
+        # if len(str(term).split(' ')) >= length:
+        if not closures or (closures and not can_be_closed(term, g)):
+            next_equation = sym.Eq(sym.Derivative(term.function()(sym.symbols('t'))),
+                                   chain_rule(term, g, model, closures))
+            if next_equation not in equations[length]:
+                equations[length].append(next_equation)
+        elif closures and can_be_closed(term, g):
+            closure_terms = replace_with_closures(term.function(), g)
+            for sub_term in closure_terms:
+                if sub_term not in lhs_terms:
+                    next_from_closures = sym.Eq(sym.Function(format_term(str(sub_term)))(sym.symbols('t')),
+                                                chain_rule(Term(format_term(str(sub_term))), g, model,
+                                                           closures))
+                    # if next_from_closures not in equations:
+                    equations[length].append(next_from_closures)
 
     # Increase length we are interested in by 1 and recur if length < num vertices in graph
-    if length + 1 <= g.number_of_nodes()+1:
-        # TODO something wrong with the stopping condition, there are some terms in last few equations
-        #  that do not seem to get equations of their own in the system
+    if length +1 <= g.number_of_nodes():
         equations = generate_equations(g, model, length + 1, closures, equations)
+
     return equations
 
 
-def get_rhs_terms(equations, length):
+def get_rhs_terms(equations, length, lhs):
     all_rhs_terms = set()
-    for eq in equations:
-        LHS = get_eq_lhs(eq)
-        if len(LHS.split(' ')) == length:
-            new_terms = list()
-            # Pre-formatting - ignore coefficients
-            for term in list(eq.rhs.args):
-                try:
-                    float(term)  # if this works, it's just a coefficient, so ignore it
-                    continue
-                except TypeError:
-                    pass
-                formatted_term = format_term(str(term))
-
-                # If term still contains *, means it's a closure term and needs splitting up into individual terms
-                if '*' in str(formatted_term):
-                    terms = str(formatted_term).split('*')
-                    for each_term in terms:
-                        each_term = each_term.replace('*', '')
-                        if each_term not in new_terms:
-                            new_terms.append(Term(each_term))
-                elif Term(formatted_term) not in new_terms:
-                    new_terms.append(Term(formatted_term))
-            all_rhs_terms.update(new_terms)
+    for eq in set().union(equations[length-1], equations[length]):
+        for term in list(eq.rhs.atoms(sym.Function)):
+            term = Term(str(term.func))
+            if term not in lhs:
+                all_rhs_terms.add(term)
     return all_rhs_terms
 
 
