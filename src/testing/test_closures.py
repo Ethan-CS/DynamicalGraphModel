@@ -30,10 +30,10 @@ def test_num_eqn_lollipop():
     lollipop_adj = np.array([[0, 1, 1, 0], [1, 0, 1, 1], [1, 1, 0, 0], [0, 1, 0, 0]])
     lollipop = networkx.from_numpy_matrix(lollipop_adj)
     all_equations = generate_equations(copy.deepcopy(lollipop), SIR)
-    assert len(all_equations) == 35
+    assert len(set().union(*all_equations.values())) == 35
 
     closed_equations = generate_equations(copy.deepcopy(lollipop), SIR, closures=True)
-    assert len(closed_equations) == 26
+    assert len(set().union(*closed_equations.values())) == 26
 
 
 def test_num_eqn_path():

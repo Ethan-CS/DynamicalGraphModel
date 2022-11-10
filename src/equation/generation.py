@@ -24,12 +24,13 @@ def get_single_equations(g, model):
     :param model: A specified compartmental model
     :return: The list of single-vertex tuples for which we require equations
     """
-    singles_equations = {1: []}
+    singles_equations = {}
+    for i in range(g.number_of_nodes()):
+        singles_equations[i+1] = []
     for state in dynamically_relevant(model):
         for node in g.nodes:
             term = Term([Vertex(state, node)])
             singles_equations[1].append(sym.Eq(sym.Derivative(sym.Function(str(term))(t)), chain_rule(term, g, model)))
-    singles_equations[2] = []
     return singles_equations
 
 
@@ -55,51 +56,59 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
    -------
    A dictionary containing the LHS terms mapped to the terms on the RHS
    """
-    if closures:
-        if len(list(nx.articulation_points(g))) == 0:
-            closures = False
+    # If closures is true and there are no cut vertices,
+    # set closures to false as no terms can be closed.
+    closures = closures and len(list(nx.articulation_points(g))) > 0
     # If no prev equations provided, get the base case (singles equations)
     if prev_equations is None:
         prev_equations = get_single_equations(g, model)
     # Get a list of the terms on LHS of previous equations
-    lhs_terms = [each.lhs for each in prev_equations[length-1]]
+    lhs_terms = [each.lhs for each in set().union(*prev_equations.values())]
     # Start with previous equations as base case and add to that list
     equations = dict(prev_equations)
-    equations[length] = []
     # Look through RHS terms of previous equations and add eqn for any terms that don't have one yet
-    for term in get_rhs_terms(equations, length, lhs_terms):
-        # If term is up to length we're considering and not already in system, add equation for it
-        # if len(str(term).split(' ')) >= length:
-        if not closures or (closures and not can_be_closed(term, g)):
-            next_equation = sym.Eq(sym.Derivative(term.function()(sym.symbols('t'))),
-                                   chain_rule(term, g, model, closures))
-            if next_equation not in equations[length]:
-                equations[length].append(next_equation)
-        elif closures and can_be_closed(term, g):
-            closure_terms = replace_with_closures(term.function(), g)
-            for sub_term in closure_terms:
-                if sub_term not in lhs_terms:
-                    next_from_closures = sym.Eq(sym.Function(format_term(str(sub_term)))(sym.symbols('t')),
-                                                chain_rule(Term(format_term(str(sub_term))), g, model,
-                                                           closures))
-                    # if next_from_closures not in equations:
-                    equations[length].append(next_from_closures)
-
+    terms = get_rhs_terms(equations, min(length, g.number_of_nodes()), lhs_terms)
+    get_specified_equations(terms, equations, lhs_terms, g, model, closures)
     # Increase length we are interested in by 1 and recur if length < num vertices in graph
-    if length +1 <= g.number_of_nodes():
+    if length < g.number_of_nodes():
+        equations = generate_equations(g, model, length+1, closures, equations)
+    elif length == g.number_of_nodes():
         equations = generate_equations(g, model, length + 1, closures, equations)
+        # See if we're missing any equations so far
+        RHS_expressions = [each.rhs for each in set().union(*equations.values())]
+        RHS = []
+        for expr in RHS_expressions:
+            RHS.extend([f.func for f in expr.atoms(sym.Function)])
+        get_specified_equations(RHS, equations, lhs_terms, g, model, closures)
 
     return equations
 
 
+def get_specified_equations(terms, equations, lhs_terms, g, model, closures):
+    for term in terms:
+        term = Term(term)
+        # If term is up to length we're considering and not already in system, add equation for it
+        if not closures or (closures and not can_be_closed(term, g)):
+            eq_rhs = chain_rule(term, g, model, closures)
+            next_equation = sym.Eq(sym.Derivative(term.function()(sym.symbols('t'))), eq_rhs)
+            lhs_terms.append(term.function()(sym.symbols('t')))
+            equations[len(str(term).split(" "))].append(next_equation)
+        else:
+            closure_terms = replace_with_closures(term.function(), g)
+            for sub_term in closure_terms:
+                if sub_term not in lhs_terms:
+                    next_from_closures = sym.Eq(sym.Derivative(sub_term.function()(sym.symbols('t'))),
+                                                chain_rule(sub_term, g, model, closures))
+                    lhs_terms.append(sub_term.function())(sym.symbols('t'))
+                    equations[len(str(sub_term).split(" "))].append(next_from_closures)
+
+
 def get_rhs_terms(equations, length, lhs):
-    all_rhs_terms = set()
-    for eq in set().union(equations[length-1], equations[length]):
-        for term in list(eq.rhs.atoms(sym.Function)):
-            term = Term(str(term.func))
-            if term not in lhs:
-                all_rhs_terms.add(term)
-    return all_rhs_terms
+    RHS_expressions = [each.rhs for each in set().union(equations[length], equations[length-1])]
+    RHS = set()
+    for expr in RHS_expressions:
+        RHS.update([f for f in expr.atoms(sym.Function) if f not in lhs])
+    return list(RHS)
 
 
 def get_eq_lhs(eq):
@@ -174,12 +183,14 @@ def derive(v: Vertex, term_without_v: Term, g: Graph, model: CModel, closures=Fa
     neighbours_of_v = [n for n in graph.neighbors(v.node)]
     # Get mapping of states to how they are entered/exited
     transitions = coupling_types(model)
-    all_terms = 0
+    all_expressions = 0
+    all_terms = []
     for transition in transitions[v.state]:
         terms = add_terms(v, term_without_v, transition, model, neighbours_of_v)
         for each_term in terms:
             if not closures:
-                all_terms += each_term
+                all_expressions += each_term
+                all_terms.append(each_term)
             else:
                 # Need to only consider the term, not any coefficients or dependencies
                 term_as_string = str(each_term)
@@ -189,24 +200,26 @@ def derive(v: Vertex, term_without_v: Term, g: Graph, model: CModel, closures=Fa
                 vertices = [Vertex(v[0], int(v[1:])) for v in cleaned.split()]
                 actual_term = Term(vertices)
                 if not can_be_closed(actual_term, graph):
-                    all_terms += each_term
+                    all_expressions += each_term
+                    all_terms.append(each_term)
                 else:
                     closure_terms = replace_with_closures(each_term, graph)
                     sub_terms = 1.0
                     for each_closure_term in closure_terms:
                         sub_terms *= each_closure_term
-                    all_terms += sub_terms
-    return all_terms
+                    all_expressions += sub_terms
+                    all_terms.append(sub_terms)
+    return all_expressions, all_terms
 
 
 # d(vw)/dt = (dv/dt)w + v(dw/dt)
 def chain_rule(term: Term, graph: Graph, model: CModel, closures=False):
     term_clone = copy.deepcopy(term)
 
-    all_terms = 0
+    expression = 0
     for v in list(term_clone.vertices):
         term_clone.remove(v)
-        terms = derive(v, term_clone, graph, model, closures)
-        all_terms += terms
+        expr, atoms = derive(v, term_clone, graph, model, closures)
+        expression += expr
         term_clone.add(v)
-    return all_terms
+    return expression

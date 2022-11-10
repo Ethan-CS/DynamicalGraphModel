@@ -52,7 +52,7 @@ def replace_with_closures(term: Term, graph: Graph):
     cut = list(nx.articulation_points(induced_subgraph))[0]
     induced_subgraph.remove_node(cut)
 
-    sub_terms = [1 / sym.Symbol(str(Vertex('S', cut)))]  # Will contain all terms to replace original with
+    sub_terms = [1 / sym.Function(str(Term([Vertex('S', cut)])))(sym.symbols('t'))]  # Will contain all terms to replace original with
 
     graph_components = []  # List of the connected components after cut-vertex removal with CV replaced in each
     for c in list(nx.connected_components(induced_subgraph)):
@@ -67,7 +67,7 @@ def replace_with_closures(term: Term, graph: Graph):
         as_vertices = [Vertex(original_states[v], v) for v in component]
         if not can_be_closed(Term(list(as_vertices)), graph):
             # Cannot be closed further, add to list of substitutions and continue
-            sub_terms.append(sym.Symbol(str(Term(as_vertices))))
+            sub_terms.append(sym.Function(str(Term(as_vertices)))(sym.symbols('t')))
         else:
             # There are remaining cut-vertices in the term, so close the term on those too
             sub_terms.append(replace_with_closures(Term(as_vertices), graph))

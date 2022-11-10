@@ -7,7 +7,7 @@ import sympy as sym
 import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
-from scipy.integrate import odeint
+from scipy.integrate import odeint, solve_ivp
 
 from equation import generate_equations, initial_conditions
 from model_params.cmodel import get_SIR
@@ -30,34 +30,34 @@ def scipy_solve():
     solve(full_equations, g)
 
 
-def solve(full_equations, g, t_max=10, step=0.1, print_option='none'):
-    LHS = [sym.Integral(each.lhs).doit() for each in list(full_equations)]
-    RHS = [each.rhs for each in list(full_equations)]
-    if print_option == 'full':
-        for i in range(len(LHS)):
-            print(f'{LHS[i]}\' = {RHS[i]}')
+def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol=0.01, atol=0.001, print_option='none'):
+    LHS = [sym.Integral(each.lhs).doit() for each in set().union(*full_equations.values())]
+    RHS = [each.rhs for each in set().union(*full_equations.values())]
 
-    def rhs(y_vec, _):
+    def rhs(_, y_vec):
         substitutions = {}
         j = 0
-        for lhs in list(LHS):
+        for lhs in LHS:
             substitutions[lhs] = y_vec[j]
             j += 1
         derivatives = []
         for r in list(RHS):
-            derivatives.append(r.xreplace(substitutions))
+            r_sub = r.xreplace(substitutions)
+            derivatives.append(r_sub)
         return derivatives
 
     st = time()
-    y0 = list(initial_conditions(list(g.nodes), list(LHS), symbol=sym.symbols('t')).values())
-    print(f'got initial conditions in {time() - st}s')
-    t = np.arange(start=0, stop=t_max, step=step)
+    if init_cond is None:
+        y0 = list(initial_conditions(list(g.nodes), list(LHS), beta=beta, symbol=sym.symbols('t')).values())
+    else:
+        y0 = list(init_cond)
+    # print(f'got initial conditions in {time() - st}s')
     st = time()
-    y_out, info = odeint(rhs, y0, t, rtol=0.00001, atol=0.000001, full_output=True)
-    print(f'solved in {time() - st}s')
+    y_out = solve_ivp(rhs, (0, t_max), y0, method="RK45", max_step=0.5, atol=1, rtol=1)
     if print_option == 'full':
-        print(integration_summary(info))
-        plot_soln(t, y_out)
+        print(f'solved in {time() - st}s')
+        # plot_soln(t, y_out)
+    return y_out
 
 
 def plot_soln(t, y_out):

@@ -1,3 +1,5 @@
+from time import time
+
 import networkx as nx
 import sympy as sym
 
@@ -5,6 +7,7 @@ from equation import generation, closing
 from equation.Term import Term, Vertex
 from equation.generation import get_single_equations, generate_equations
 from equation.solving import initial_conditions, solve_equations
+from equation.testing_numerical_solvers import solve
 from equation_MC_comparison import measure_generation_runtimes
 from model_params.cmodel import get_SIR
 
@@ -12,23 +15,14 @@ from model_params.cmodel import get_SIR
 def main():
     # measure_runtimes()
     print('starting')
-    path = nx.path_graph(10)
-    equations = generate_equations(path, get_SIR(), closures=False)
-    LHS = [sym.Integral(each.lhs).doit() for each in set().union(*equations.values())]
-    RHS_expressions = [each.rhs for each in set().union(*equations.values())]
-    RHS = []
-    # for r in RHS_expressions:
-    #     RHS.extend([f.func for f in r.atoms(sym.Function)])
-    for r in RHS_expressions:
-        RHS.extend([f.func for f in r.atoms(sym.Function)])
-    print('symbols with no equations:')
-    for r in RHS:
-        if r(sym.symbols('t')) not in LHS:
-            print(str(r))
-    print(f'{len(LHS)}, {len(set(RHS))}')
-    print('DONE')
-    # for e in equations:
-    #     print(f'{sym.Integral(e.lhs).doit()}\'={e.rhs}')
+    path = nx.complete_graph(5)
+    start = time()
+    equations = generate_equations(path, get_SIR(beta=0.9, gamma=0.3), closures=True)
+    print(f'time to generate {len(set().union(*equations.values()))} equations: {time() - start}s')
+    solution = solve(equations, path, beta=0.5, t_max=7, atol=1e-6, rtol=1e-6, step=0.01, print_option='full')
+    equations = list(set().union(*equations.values()))
+    # for i in range(len(equations)):
+    #     print(sym.Integral(equations[i].lhs).doit().func, '(5)=', round(solution[-1][i], 2))
 
 
 def measure_runtimes():

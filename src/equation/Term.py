@@ -15,6 +15,13 @@ def is_valid(candidate: str):
 class Term:
     def __init__(self, _vertices):
         assert _vertices != [], 'Vertex list is empty'
+        if type(_vertices) == Term:
+            _vertices = _vertices.vertices()
+
+        if type(_vertices) == sym.Function:
+            _vertices = str(_vertices.func)
+        elif type(_vertices) is not list:
+            _vertices = str(_vertices)
 
         if type(_vertices) == str:
             _vertices = vertices_to_list(_vertices)
