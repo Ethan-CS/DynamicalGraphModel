@@ -61,8 +61,8 @@ def run_to_average(graph, model, init_state, t_max, solution=None, tolerance=0.1
         solution = solution[:len(init_state)]
         solution_range = [(s-tolerance/2, s+tolerance/2) for s in solution]
         # TODO output results for (up to) all same probabilities that are solved in equations case?
-    results = pd.DataFrame(columns=[i for i in range(len(init_state))])
-    averages = pd.DataFrame(columns=[i for i in range(len(init_state))])
+    results = pd.DataFrame(columns=[i for i in range(len(init_state))], dtype=object)
+    averages = pd.DataFrame(columns=[i for i in range(len(init_state))], dtype=object)
     start = time()
     counter = 1
     while True:

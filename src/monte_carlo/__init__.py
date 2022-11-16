@@ -1,5 +1,4 @@
-from monte_carlo import *
-from monte_carlo.mc_sim import try_run_to_avg
+from src.monte_carlo.mc_sim import try_run_to_avg
 
 
 def main():
