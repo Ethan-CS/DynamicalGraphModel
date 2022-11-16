@@ -68,10 +68,9 @@ def run_to_average(graph, model, init_state, t_max, solution=None, tolerance=0.1
     while True:
         results = pd.concat([results, pd.DataFrame(data=[monte_carlo_sim(graph, model, init_state, t_max)])])
         within = True  # set to False if averages not inside acceptable range
-        prev_mean = [-1 for _ in range(len(results.columns))] if averages.empty else averages.values[-1].tolist()
-
+        prev_mean = [-1 for _ in range(len(results.columns))] if averages.empty else averages.iloc[-1].tolist()
         mean = [results[i].mean() for i in range(len(results.columns))]
-        averages = pd.concat([averages, pd.DataFrame(data=[mean])])
+        averages = pd.concat([averages, pd.DataFrame(data=[mean])]).reset_index(drop=True)
         for i in range(len(mean)):
             if solution is None:
                 solution_range = [(s - tolerance / 2, s + tolerance / 2) for s in prev_mean]
@@ -95,38 +94,37 @@ def run_to_average(graph, model, init_state, t_max, solution=None, tolerance=0.1
 
 def try_run_to_avg():
     print('setting up...')
-    tree = nx.path_graph(10)
+    graph = nx.path_graph(10)
+    print('Graph:', graph)
     beta, gamma = 0.7, 0.3
     SIR = get_SIR(beta, gamma)
     tolerance = 1e-1
+    timeout = 30
     t_max = 5
-    print('finished set-up, generating equations...')
+    print('finished set-up, generating equations...\n')
 
     start = time()
-    equations = generate_equations(tree, SIR, closures=True)
+    equations = generate_equations(graph, SIR, closures=True)
     generate = time()-start
-    print(f'time to get {len(set().union(*equations.values()))} equations: {generate}')
+    print(f'time to get {len(set().union(*equations.values()))} equations: {generate}\n')
 
     LHS = [sym.Integral(each.lhs).doit() for each in set().union(*equations.values())]
-    init_cond = initial_conditions(list(tree.nodes), list(LHS), beta=beta, symbol=sym.symbols('t'))
+    init_cond = initial_conditions(list(graph.nodes), list(LHS), beta=beta, symbol=sym.symbols('t'))
 
-    start = time()
-    solution = solve(equations, tree, init_cond=init_cond.values(), t_max=t_max, atol=tolerance, rtol=tolerance,
+    solution = solve(equations, graph, init_cond=init_cond.values(), t_max=t_max, atol=tolerance, rtol=tolerance,
                      step=0.1, print_option='full')
-    sol = time() - start
-    print(f'time to solve equations: {sol}')
 
     all_equations = []
     for e in equations:
         all_equations.extend(equations[e])
 
     print(solution['message'])
-    sub_solution = list(solution['y'])[-1][:5]
-    print('solution[:5] is', [(0 if i < 0 else round(min(i, 1), 5)) for i in sub_solution])
+    # sub_solution = list(solution['y'])[-1]
+    # print('solution is', [(0 if i < 0 else round(min(i, 1), 5)) for i in sub_solution])
 
     choice = -1
     t = sym.symbols('t')
-    for v in tree.nodes:
+    for v in graph.nodes:
         if init_cond[sym.Function(str(Vertex('S', v)))(t)] < init_cond[sym.Function(str(Vertex('I', v)))(t)]:
             choice = v
             break
@@ -134,12 +132,19 @@ def try_run_to_avg():
         print('there\'s a problem!')
         print(init_cond)
 
-    # run_to_average(tree, SIR, set_initial_state(SIR, tree, choice=choice), 10, solution['y'], 0.25, 60)
-
-    print('solving using MC to consistent average...')
+    # TODO This is frequently wrong - why?
+    # Edge cases (two susceptible, one infected but not connected, etc.)
+    print('\nsolving using MC to defined average...')
     start = time()
-    soln_mc_avg = run_to_average(tree, SIR, init_state=set_initial_state(SIR, tree, choice=choice), t_max=t_max,
-                                 tolerance=tolerance, timeout=60, num_rounds=100)
+    run_to_average(graph, SIR, set_initial_state(SIR, graph, choice=choice), 10, solution['y'][-1], tolerance=0.2,
+                   timeout=timeout)
+    sol = time() - start
+    print(f'time to solve to defined average: {sol if sol<timeout else "TO"}')
+
+    print('\nsolving using MC to consistent average...')
+    start = time()
+    soln_mc_avg = run_to_average(graph, SIR, init_state=set_initial_state(SIR, graph, choice=choice), t_max=t_max,
+                                 tolerance=tolerance, timeout=timeout, num_rounds=100)
     sol = time() - start
     print(f'time to solve to consistent average: {sol}')
     # print(soln_mc_avg)

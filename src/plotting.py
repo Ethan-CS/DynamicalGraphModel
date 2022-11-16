@@ -41,8 +41,7 @@ def plot_style(max_val, title, x_label, y_label):
 
 
 def main():
-    # plot_averages(pd.read_csv(f'data/path_data.csv'), pd.read_csv(f'data/cycle_data.csv'), pd.read_csv(f'data/tree_data.csv'))
-
+    plot_averages(pd.read_csv(f'data/path_data.csv'), pd.read_csv(f'data/cycle_data.csv'), pd.read_csv(f'data/tree_data.csv'))
     plot_full_vs_closures(['tree'])
 
 

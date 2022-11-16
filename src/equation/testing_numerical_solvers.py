@@ -53,7 +53,7 @@ def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol
         y0 = list(init_cond)
     # print(f'got initial conditions in {time() - st}s')
     st = time()
-    y_out = solve_ivp(rhs, (0, t_max), y0, method="RK45", max_step=0.5, atol=1, rtol=1)
+    y_out = solve_ivp(rhs, (0, t_max), y0, method="RK23", max_step=0.5, atol=1, rtol=1)
     if print_option == 'full':
         print(f'solved in {time() - st}s')
         # plot_soln(t, y_out)
