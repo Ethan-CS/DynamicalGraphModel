@@ -9,8 +9,8 @@ from equation.generation import format_term
 def initial_conditions(nodes, functions, num_initial_infected=1, symbol=0, beta=0.75):
     initial_values = {}
     for node in list(nodes):
-        initial_values[sym.Function(str(Vertex('S', node)))(symbol)] = 0.95
-        initial_values[sym.Function(str(Vertex('I', node)))(symbol)] = 0.05
+        initial_values[sym.Function(str(Vertex('S', node)))(symbol)] = beta
+        initial_values[sym.Function(str(Vertex('I', node)))(symbol)] = 1 - beta
 
     for _ in range(0, num_initial_infected):
         initial_infected = random.choice(nodes)

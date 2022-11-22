@@ -50,7 +50,7 @@ def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol
     if init_cond is None:
         y0 = list(initial_conditions(list(g.nodes), list(LHS), beta=beta, symbol=sym.symbols('t')).values())
     else:
-        y0 = list(init_cond)
+        y0 = list(init_cond.values())
     # print(f'got initial conditions in {time() - st}s')
     st = time()
     y_out = solve_ivp(rhs, (0, t_max), y0, method="RK23", max_step=0.5, atol=1, rtol=1)

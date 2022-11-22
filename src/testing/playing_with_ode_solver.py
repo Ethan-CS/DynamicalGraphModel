@@ -57,7 +57,8 @@ def main():
     IV[I1S2I3(0)] = IV[I1(0)] * IV[S2(0)] * IV[I3(0)]
 
     print('passing equations and I.C.s into solver...')
-    sol = sym.solvers.ode.systems.dsolve_system(eqs=triangle_generated, funcs=functions,
+    equations = set().union(*triangle_generated.values())
+    sol = sym.solvers.ode.systems.dsolve_system(eqs=equations, funcs=functions,
                                                 t=t, ics=IV)
     print('solved!')
 
@@ -75,5 +76,5 @@ def main():
     p.show()
 
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()

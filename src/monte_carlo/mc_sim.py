@@ -6,6 +6,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import sympy as sym
+from matplotlib import pyplot as plt
 
 from equation import generate_equations, initial_conditions, Vertex
 from equation.testing_numerical_solvers import solve, plot_soln
@@ -60,7 +61,6 @@ def run_to_average(graph, model, init_state, t_max, solution=None, tolerance=0.1
     if solution is not None:
         solution = solution[:len(init_state)]
         solution_range = [(s-tolerance/2, s+tolerance/2) for s in solution]
-        # TODO output results for (up to) all same probabilities that are solved in equations case?
     results = pd.DataFrame(columns=[i for i in range(len(init_state))], dtype=object)
     averages = pd.DataFrame(columns=[i for i in range(len(init_state))], dtype=object)
     start = time()
@@ -79,51 +79,95 @@ def run_to_average(graph, model, init_state, t_max, solution=None, tolerance=0.1
                 counter = 1  # Reset the counter
                 break
         if within:
-            if solution is not None or counter == num_rounds:
+            if counter == num_rounds:
                 # print(f'succeeded in {time() - start}s')
                 # print('final avg:', [results[i].mean() for i in results.columns])
-                return results
+                return averages
             else:
                 counter += 1
 
         if time() - start >= timeout:
             print('timeout!')
             # print('final avg:', [results[i].mean() for i in results.columns])
-            return results
+            return averages
 
 
 def try_run_to_avg():
-    print('setting up...')
-    graph = nx.path_graph(10)
-    print('Graph:', graph)
+    t = sym.symbols('t')
+    graph = nx.path_graph(5)
     beta, gamma = 0.7, 0.3
     SIR = get_SIR(beta, gamma)
-    tolerance = 1e-1
-    timeout = 30
+    tol = 1e-3
+    timeout = 180
     t_max = 5
-    print('finished set-up, generating equations...\n')
+    num_rounds = 100
+    print('finished set-up, generating equations...')
 
     start = time()
     equations = generate_equations(graph, SIR, closures=True)
     generate = time()-start
-    print(f'time to get {len(set().union(*equations.values()))} equations: {generate}\n')
+    print(f'\ntime to get {len(set().union(*equations.values()))} equations: {generate}')
 
     LHS = [sym.Integral(each.lhs).doit() for each in set().union(*equations.values())]
-    init_cond = initial_conditions(list(graph.nodes), list(LHS), beta=beta, symbol=sym.symbols('t'))
+    init_cond = initial_conditions(list(graph.nodes), list(LHS), beta=beta, symbol=t)
 
-    solution = solve(equations, graph, init_cond=init_cond.values(), t_max=t_max, atol=tolerance, rtol=tolerance,
-                     step=0.1, print_option='full')
+    init_cond_for_analytic = dict()
+    for i in init_cond:
+        init_cond_for_analytic[i.subs(t, 0)] = round(init_cond[i], 3)
+    print(f'\nInitial conditions:\n{init_cond_for_analytic}\n')
+
+    numerical_solution = solve(equations, graph, init_cond=init_cond, t_max=t_max, step=0.1,
+                               print_option='full')
+    print(f'\n{numerical_solution["message"]}')
+    analytic = False
+    try:
+        analytical_solution = sym.solvers.ode.systems.dsolve_system(eqs=set().union(*equations.values()), funcs=LHS,
+                                                                    t=t, ics=init_cond_for_analytic)
+        print(f'\nAnalytical solution:\n{analytical_solution}')
+        soln = dict(zip(init_cond.keys(), analytical_solution[-1]))
+        analytic = True
+    except NotImplementedError:
+        soln = dict(zip(init_cond.keys(), numerical_solution['y'][-1].tolist()))
+        print('\nCould not solve system analytically.')
 
     all_equations = []
     for e in equations:
         all_equations.extend(equations[e])
 
-    print(solution['message'])
-    # sub_solution = list(solution['y'])[-1]
-    # print('solution is', [(0 if i < 0 else round(min(i, 1), 5)) for i in sub_solution])
+    choice = find_infected_from_init_cond(graph, init_cond, t)
+    print('\ninitial infected:', choice)
 
+    conditions_for_mc = {}
+    for i in range(graph.number_of_nodes()):
+        fun = sym.Function(str(Vertex('I', i)))(t)
+        if analytic:
+            val = round(soln[fun].rhs.subs(t, t_max), 2)
+        else:
+            val = round(soln[fun], 2)
+        conditions_for_mc[fun] = 0 if val < 0 else min(val, 1)
+
+    print(f'\nsolving using MC to defined average using:\n{conditions_for_mc}')
+    start = time()
+    mc_defined = run_to_average(graph, SIR, set_initial_state(SIR, graph, choice=choice), 10,
+                                list(conditions_for_mc.values()), tolerance=tol, timeout=timeout,
+                                num_rounds=num_rounds)
+    sol = time() - start
+    print(f'time to solve to defined average: {sol if sol<timeout else "TO"}')
+    print(f'solution:\n{mc_defined.tail(1)}')
+    mc_defined.plot()
+    plt.show()
+
+    # print('\nsolving using MC to consistent average...')
+    # start = time()
+    # mc_avg = run_to_average(graph, SIR, init_state=set_initial_state(SIR, graph, choice=choice), t_max=t_max,
+    #                         tolerance=tol, timeout=timeout, num_rounds=num_rounds)
+    # sol = time() - start
+    # print(f'time to solve to consistent average: {sol if sol<timeout else "TO"}')
+    # print(f'solution:\n{mc_avg.tail(1)}')
+
+
+def find_infected_from_init_cond(graph, init_cond, t):
     choice = -1
-    t = sym.symbols('t')
     for v in graph.nodes:
         if init_cond[sym.Function(str(Vertex('S', v)))(t)] < init_cond[sym.Function(str(Vertex('I', v)))(t)]:
             choice = v
@@ -131,20 +175,4 @@ def try_run_to_avg():
     if choice < 0:
         print('there\'s a problem!')
         print(init_cond)
-
-    # TODO This is frequently wrong - why?
-    # Edge cases (two susceptible, one infected but not connected, etc.)
-    print('\nsolving using MC to defined average...')
-    start = time()
-    run_to_average(graph, SIR, set_initial_state(SIR, graph, choice=choice), 10, solution['y'][-1], tolerance=0.2,
-                   timeout=timeout)
-    sol = time() - start
-    print(f'time to solve to defined average: {sol if sol<timeout else "TO"}')
-
-    print('\nsolving using MC to consistent average...')
-    start = time()
-    soln_mc_avg = run_to_average(graph, SIR, init_state=set_initial_state(SIR, graph, choice=choice), t_max=t_max,
-                                 tolerance=tolerance, timeout=timeout, num_rounds=100)
-    sol = time() - start
-    print(f'time to solve to consistent average: {sol}')
-    # print(soln_mc_avg)
+    return choice
