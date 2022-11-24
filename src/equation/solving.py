@@ -6,16 +6,20 @@ from equation import Vertex
 from equation.generation import format_term
 
 
-def initial_conditions(nodes, functions, num_initial_infected=1, symbol=0, beta=0.75):
+def initial_conditions(nodes, functions, choice=None, num_initial_infected=1, symbol=0, beta=0.75):
     initial_values = {}
     for node in list(nodes):
         initial_values[sym.Function(str(Vertex('S', node)))(symbol)] = 1
         initial_values[sym.Function(str(Vertex('I', node)))(symbol)] = 0.0001
 
-    for _ in range(0, num_initial_infected):
-        initial_infected = random.choice(nodes)
-        initial_values[sym.Function(str(Vertex('S', initial_infected)))(symbol)] = 0.0001
-        initial_values[sym.Function(str(Vertex('I', initial_infected)))(symbol)] = 1
+    if choice is not None:
+        for _ in range(0, num_initial_infected):
+            initial_infected = random.choice(nodes)
+            initial_values[sym.Function(str(Vertex('S', initial_infected)))(symbol)] = 0.0001
+            initial_values[sym.Function(str(Vertex('I', initial_infected)))(symbol)] = 1
+    else:
+        initial_values[sym.Function(str(Vertex('S', choice)))(symbol)] = 0.0001
+        initial_values[sym.Function(str(Vertex('I', choice)))(symbol)] = 1
 
     for f in list(functions):
         formatted = format_term(str(f).split('\u3009')[0])
