@@ -30,7 +30,7 @@ def scipy_solve():
     solve(full_equations, g)
 
 
-def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol=0.01, atol=0.001, print_option='none'):
+def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol=1, atol=1, print_option='none'):
     LHS = [sym.Integral(each.lhs).doit() for each in set().union(*full_equations.values())]
     RHS = [each.rhs for each in set().union(*full_equations.values())]
 
@@ -53,19 +53,17 @@ def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol
         y0 = list(init_cond.values())
     # print(f'got initial conditions in {time() - st}s')
     st = time()
-    y_out = solve_ivp(rhs, (0, t_max), y0, method="RK23", max_step=0.5, atol=1, rtol=1)
+    y_out = solve_ivp(rhs, (0, t_max), y0, method="RK23", max_step=step, rtol=rtol, atol=atol)
     if print_option == 'full':
         print(f'solved in {time() - st}s')
-        # plot_soln(t, y_out)
+        for i in range(y_out.y.shape[0]):
+            t = y_out.t
+            y = [max(min(i, 1), 0) for i in y_out.y[i]]
+            plt.plot(t, y, label=LHS[i])
+            plt.xlabel('t')
+            plt.ylabel('soln')
+        plt.show()
     return y_out
-
-
-def plot_soln(t, y_out):
-    plt.plot(t, y_out)
-    plt.xlabel('t')
-    plt.ylabel('soln')
-    plt.savefig('test.png')
-    plt.show()
 
 
 def integration_summary(info):

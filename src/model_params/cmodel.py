@@ -1,5 +1,4 @@
 import numpy as np
-import warnings
 from collections import OrderedDict, namedtuple
 from scipy.integrate import odeint, solve_ivp
 from scipy.optimize import minimize

@@ -9,13 +9,13 @@ from equation.generation import format_term
 def initial_conditions(nodes, functions, num_initial_infected=1, symbol=0, beta=0.75):
     initial_values = {}
     for node in list(nodes):
-        initial_values[sym.Function(str(Vertex('S', node)))(symbol)] = beta
-        initial_values[sym.Function(str(Vertex('I', node)))(symbol)] = 1 - beta
+        initial_values[sym.Function(str(Vertex('S', node)))(symbol)] = 1
+        initial_values[sym.Function(str(Vertex('I', node)))(symbol)] = 0.0001
 
     for _ in range(0, num_initial_infected):
         initial_infected = random.choice(nodes)
-        initial_values[sym.Function(str(Vertex('S', initial_infected)))(symbol)] = 1-beta
-        initial_values[sym.Function(str(Vertex('I', initial_infected)))(symbol)] = beta
+        initial_values[sym.Function(str(Vertex('S', initial_infected)))(symbol)] = 0.0001
+        initial_values[sym.Function(str(Vertex('I', initial_infected)))(symbol)] = 1
 
     for f in list(functions):
         formatted = format_term(str(f).split('\u3009')[0])
