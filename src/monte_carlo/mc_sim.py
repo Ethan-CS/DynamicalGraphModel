@@ -86,19 +86,19 @@ def run_to_average(graph, model, init_state, t_max, solution=None, tolerance=0.1
     solution_range = []
     if solution is not None:
         solution_range = [(s - tolerance, s + tolerance) for s in list(solution.values())]
-        print(f'Solution range:\n{solution_range}')
-    results = pd.DataFrame(columns=[i for i in range(len(init_state))], dtype=object)
+    head = [i for i in range(len(init_state))]
+    results = pd.DataFrame(columns=head, dtype=object)
     averages = pd.DataFrame(columns=[i for i in range(len(init_state))], dtype=object)
     start = time()
     counter = 1
     while True:
         results = pd.concat([results, pd.DataFrame(data=[monte_carlo_sim(graph, model, init_state, t_max)])])
         if averages.empty:
-            prev_mean = [-1 for _ in range(len(results.columns))]
+            prev_mean = [-1 for _ in range(len(results.columns))]  # -1 as there is no prev mean on first iteration
         else:
-            prev_mean = averages.iloc[-1].tolist()
+            prev_mean = averages.iloc[-1].tolist()  # If there is a prev mean, get last row of averages table
 
-        if solution is None:
+        if solution is None:  # Means we are running to own consistent average, not to target average
             solution_range = [(s - tolerance, s + tolerance) for s in prev_mean]
 
         mean = [results[i].mean() for i in range(len(results.columns))]
@@ -110,20 +110,12 @@ def run_to_average(graph, model, init_state, t_max, solution=None, tolerance=0.1
                 within = False
                 counter = 1  # Reset the counter
                 break
-            # else:
-            #     print(f'{mean[i]} is within ({round(solution_range[i][0], 5)}, {round(solution_range[i][1], 5)})')
-
         if within:
             if counter == num_rounds:
-                # print(f'succeeded in {time() - start}s')
-                # print('final avg:', [results[i].mean() for i in results.columns])
                 return averages
             else:
                 counter += 1
-
         if time() - start >= timeout:
-            print('timeout!')
-            # print('final avg:', [results[i].mean() for i in results.columns])
             return averages
 
 
@@ -132,35 +124,44 @@ def try_run_to_avg():
     graph = nx.path_graph(10)
     beta, gamma = 0.8, 0.1
     model = get_SIR(beta, gamma)
-    tol = 1e-6
+    tol = 1e-1
     timeout = 30
     t_max = 5
-    num_rounds = 1000
+    num_rounds = 100
 
     # soln = numerical_solve(model, beta, graph, t, t_max)
-    soln = [((1-gamma)**t_max), beta*(1-gamma)**4, (beta**2)*(1-gamma)**3, (beta**3)*(1-gamma)**2,
-            (beta**4)*(1-gamma), beta ** 5, 0, 0, 0, 0]
+    soln = [0.59, 0.66, 0.73, 0.77, 0.67, 0.33, 0, 0, 0, 0, 0]
 
     print(f'hard-coded solution:\n{soln}')
 
-    # target_for_mc = {}
-    # for i in range(graph.number_of_nodes()):
-    #     fun = sym.Function(str(Vertex('I', i)))(t)
-    #     val = round(soln[i], 2)
-    #     target_for_mc[fun] = val
-    #
+    target_for_mc = {}
+    for i in range(graph.number_of_nodes()):
+        fun = sym.Function(str(Vertex('I', i)))(t)
+        val = soln[i]
+        target_for_mc[fun] = val
+
     choice = 0
-    # print('\ninitial infected:', choice)
+    print('\ninitial infected:', choice)
     initial_for_mc = set_initial_state(model, graph, choice=choice)
-    # mc_defined = solve_with_mc(model, target_for_mc, graph, initial_for_mc, num_rounds, t_max, timeout, tol)
-    # mc_defined.plot()
-    # plt.show()
-    # print(mc_defined.values[-1].tolist())
-    #
+    mc_defined = solve_with_mc(model, target_for_mc, graph, initial_for_mc, num_rounds, t_max, timeout, tol)
+    plot_mc_averages(mc_defined, soln)
+    print(mc_defined.values[-1].tolist())
+
     mc_avg = solve_with_mc(model, None, graph, initial_for_mc, t_max=t_max, tol=tol, timeout=timeout, num_rounds=num_rounds)
-    # mc_avg.plot()
-    # plt.show()
+    plot_mc_averages(mc_avg, soln)
     print(mc_avg.values[-1].tolist())
+
+
+def plot_mc_averages(mc_averages, soln):
+    mc_averages.columns = [f'$I_{i}$' for i in range(len(mc_averages.columns))]
+    mc_averages.plot()
+    count = 0
+    for i in soln:
+        plt.axhline(y=i, linestyle='--', label=f'True $I_{count}$')
+        count += 1
+    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+    plt.tight_layout()
+    plt.show()
 
 
 def solve_with_mc(model, target_average, graph, init_for_MC, num_rounds, t_max, timeout, tol):
