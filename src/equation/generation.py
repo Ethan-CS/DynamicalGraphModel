@@ -27,14 +27,16 @@ def get_single_equations(g, model):
     singles_equations = {}
     for i in range(g.number_of_nodes()):
         singles_equations[i+1] = []
+    lhs = []
     for state in dynamically_relevant(model):
         for node in g.nodes:
             term = Term([Vertex(state, node)])
+            lhs.append(sym.Function(str(term))(sym.symbols('t')))
             singles_equations[1].append(sym.Eq(sym.Derivative(sym.Function(str(term))(t)), chain_rule(term, g, model)))
-    return singles_equations
+    return singles_equations, lhs
 
 
-def generate_equations(g, model, length=2, closures=False, prev_equations=None):
+def generate_equations(g, model, length=2, closures=False, prev_equations=None, lhs_terms=None):
     """
    Generates the required equations for the model defined by the specified contact network and compartmental model.
 
@@ -51,35 +53,29 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None):
         definition of the compartmental model.
     closures : bool
         True if we are introducing moment closures on cut-vertices, false otherwise.
+    lhs_terms : list
+        All terms for which we already have equations.
 
    Returns
    -------
    A dictionary containing the LHS terms mapped to the terms on the RHS
    """
-    # If closures is true and there are no cut vertices,
-    # set closures to false as no terms can be closed.
+    # If there are no cut vertices, set closures to false as no terms can be closed.
     closures = closures and len(list(nx.articulation_points(g))) > 0
     # If no prev equations provided, get the base case (singles equations)
     if prev_equations is None:
-        prev_equations = get_single_equations(g, model)
+        prev_equations, lhs_terms = get_single_equations(g, model)
     # Get a list of the terms on LHS of previous equations
-    lhs_terms = [each.lhs for each in set().union(*prev_equations.values())]
+    if lhs_terms is None:
+        lhs_terms = [sym.Integral(each.lhs).doit() for each in set().union(*prev_equations.values())]
     # Start with previous equations as base case and add to that list
-    equations = dict(prev_equations)
+    equations = prev_equations
     # Look through RHS terms of previous equations and add eqn for any terms that don't have one yet
     terms = get_rhs_terms(equations, min(length, g.number_of_nodes()), lhs_terms)
     get_specified_equations(terms, equations, lhs_terms, g, model, closures)
     # Increase length we are interested in by 1 and recur if length < num vertices in graph
-    if length < g.number_of_nodes():
-        equations = generate_equations(g, model, length+1, closures, equations)
-    elif length == g.number_of_nodes():
-        equations = generate_equations(g, model, length + 1, closures, equations)
-        # See if we're missing any equations so far
-        RHS_expressions = [each.rhs for each in set().union(*equations.values())]
-        RHS = []
-        for expr in RHS_expressions:
-            RHS.extend([f.func for f in expr.atoms(sym.Function)])
-        get_specified_equations(RHS, equations, lhs_terms, g, model, closures)
+    if length <= g.number_of_nodes() and len(equations[length]) > 0:
+        generate_equations(g, model, length+1, closures, equations, lhs_terms)
 
     return equations
 
@@ -88,27 +84,29 @@ def get_specified_equations(terms, equations, lhs_terms, g, model, closures):
     for term in terms:
         term = Term(term)
         # If term is up to length we're considering and not already in system, add equation for it
-        if not closures or (closures and not can_be_closed(term, g)):
-            eq_rhs = chain_rule(term, g, model, closures)
-            next_equation = sym.Eq(sym.Derivative(term.function()(sym.symbols('t'))), eq_rhs)
-            lhs_terms.append(term.function()(sym.symbols('t')))
-            equations[len(str(term).split(" "))].append(next_equation)
-        else:
+        new_term = term.function()
+        if new_term not in lhs_terms:
+            if not closures or (closures and not can_be_closed(term, g)):
+                eq_rhs = chain_rule(term, g, model, closures)
+                next_equation = sym.Eq(sym.Derivative(term.function()(sym.symbols('t'))), eq_rhs)
+                equations[len(str(term).split(" "))].append(next_equation)
+                lhs_terms.append(new_term)
+        elif can_be_closed(term, g):
             closure_terms = replace_with_closures(term.function(), g)
             for sub_term in closure_terms:
                 if sub_term not in lhs_terms:
                     next_from_closures = sym.Eq(sym.Derivative(sub_term.function()(sym.symbols('t'))),
                                                 chain_rule(sub_term, g, model, closures))
-                    lhs_terms.append(sub_term.function())(sym.symbols('t'))
                     equations[len(str(sub_term).split(" "))].append(next_from_closures)
+                    lhs_terms.append(sym.Function(str(sub_term.function()))(t))
 
 
 def get_rhs_terms(equations, length, lhs):
-    RHS_expressions = [each.rhs for each in set().union(equations[length], equations[length-1])]
-    RHS = set()
-    for expr in RHS_expressions:
-        RHS.update([f for f in expr.atoms(sym.Function) if f not in lhs])
-    return list(RHS)
+    rhs_expressions = [each.rhs for each in set().union(equations[length], equations[length-1])]
+    rhs = set()
+    for expr in rhs_expressions:
+        rhs.update([f for f in expr.atoms(sym.Function) if f not in lhs])
+    return list(rhs)
 
 
 def get_eq_lhs(eq):

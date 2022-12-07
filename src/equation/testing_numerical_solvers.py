@@ -30,39 +30,40 @@ def scipy_solve():
     solve(full_equations, g)
 
 
-def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol=1, atol=1, print_option='none'):
-    LHS = [sym.Integral(each.lhs).doit() for each in set().union(*full_equations.values())]
-    RHS = [each.rhs for each in set().union(*full_equations.values())]
+def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol=0.1, atol=0.1, print_option='none'):
+    LHS, RHS = [], []
+    for list_of_eqn in full_equations.values():
+        for each_eqn in list_of_eqn:
+            LHS.append(sym.Integral(each_eqn.lhs).doit())
+            RHS.append(each_eqn.rhs)
+    print(*list(zip(LHS, RHS)), sep='\n')
 
     def rhs(_, y_vec):
-        substitutions = {}
+        # y_vec just contains values. We need to replace
+        # terms in equations with corresponding values
+        substitutions = {}  # dict with symbols as keys and corresponding y_vec at pos. as values
         j = 0
         for lhs in LHS:
             substitutions[lhs] = y_vec[j]
             j += 1
+        # Make the substitutions and store the results in a list
         derivatives = []
         for r in list(RHS):
             r_sub = r.xreplace(substitutions)
-            derivatives.append(r_sub)
+            derivatives.append(r_sub)  # indices should be consistent over LHS, y_vec and derivatives
         return derivatives
 
-    st = time()
     if init_cond is None:
+        # st = time()
         y0 = list(initial_conditions(list(g.nodes), list(LHS), beta=beta, symbol=sym.symbols('t')).values())
+        # print(f'got initial conditions in {time() - st}s')
     else:
         y0 = list(init_cond.values())
-    # print(f'got initial conditions in {time() - st}s')
+
     st = time()
     y_out = solve_ivp(rhs, (0, t_max), y0, method="RK23", max_step=step, rtol=rtol, atol=atol)
     if print_option == 'full':
         print(f'solved in {time() - st}s')
-        for i in range(y_out.y.shape[0]):
-            t = y_out.t
-            y = [max(min(i, 1), 0) for i in y_out.y[i]]
-            plt.plot(t, y, label=LHS[i])
-            plt.xlabel('t')
-            plt.ylabel('soln')
-        plt.show()
     return y_out
 
 

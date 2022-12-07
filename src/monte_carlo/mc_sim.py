@@ -121,8 +121,8 @@ def run_to_average(graph, model, init_state, t_max, solution=None, tolerance=0.1
 
 def try_run_to_avg():
     t = sym.symbols('t')
-    graph = nx.path_graph(10)
-    beta, gamma = 0.8, 0.1
+    graph = nx.cycle_graph(3)
+    beta, gamma = 0.5, 0.0
     model = get_SIR(beta, gamma)
     tol = 1e-1
     timeout = 30
