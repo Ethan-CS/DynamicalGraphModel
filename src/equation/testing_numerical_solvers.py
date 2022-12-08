@@ -46,6 +46,7 @@ def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol
         for lhs in LHS:
             substitutions[lhs] = y_vec[j]
             j += 1
+        # print(substitutions)
         # Make the substitutions and store the results in a list
         derivatives = []
         for r in list(RHS):
@@ -55,13 +56,13 @@ def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol
 
     if init_cond is None:
         # st = time()
-        y0 = list(initial_conditions(list(g.nodes), list(LHS), beta=beta, symbol=sym.symbols('t')).values())
+        y0 = list(initial_conditions(list(g.nodes), list(LHS), symbol=sym.symbols('t')).values())
         # print(f'got initial conditions in {time() - st}s')
     else:
         y0 = list(init_cond.values())
 
     st = time()
-    y_out = solve_ivp(rhs, (0, t_max), y0, method="RK23", max_step=step, rtol=rtol, atol=atol)
+    y_out = solve_ivp(rhs, (0, t_max), y0, method="Radau", max_step=step, rtol=rtol, atol=atol)
     if print_option == 'full':
         print(f'solved in {time() - st}s')
     return y_out

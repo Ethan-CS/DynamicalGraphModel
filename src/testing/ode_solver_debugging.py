@@ -6,7 +6,7 @@ import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
 
-from equation import generate_equations, get_SIR, Term, Vertex, solve
+from equation import generate_equations, get_SIR, Term, Vertex, solve, initial_conditions
 
 matplotlib.use('TkAgg')
 
@@ -16,53 +16,36 @@ sns.set_context('notebook')
 sns.set_style("ticks")
 
 t = sym.symbols('t')
-
-# Variables
-v_s1, v_s2, v_s3 = Vertex('S', 0), Vertex('S', 1), Vertex('S', 2)
-v_i1, v_i2, v_i3 = Vertex('I', 0), Vertex('I', 1), Vertex('I', 2)
-# Functions
-S1, S2, S3 = sym.Function(str(Term([v_s1]))), sym.Function(str(Term([v_s2]))), sym.Function(str(Term([v_s3])))
-I1, I2, I3 = sym.Function(str(Term([v_i1]))), sym.Function(str(Term([v_i2]))), sym.Function(str(Term([v_i3])))
-S1I2, I1S2 = sym.Function(str(Term([v_s1, v_i2]))), sym.Function(str(Term([v_i1, v_s2])))
-S1I3, I1S3 = sym.Function(str(Term([v_s1, v_i3]))), sym.Function(str(Term([v_i1, v_s3])))
-S2I3, I2S3 = sym.Function(str(Term([v_s2, v_i3]))), sym.Function(str(Term([v_i2, v_s3])))
-S1S2I3, S1I2S3 = sym.Function(str(Term([v_s1, v_s2, v_i3]))), sym.Function(str(Term([v_s1, v_i2, v_s3])))
-S1I2I3, I1S2S3 = sym.Function(str(Term([v_s1, v_i2, v_i3]))), sym.Function(str(Term([v_i1, v_s2, v_s3])))
-I1I2S3, I1S2I3 = sym.Function(str(Term([v_i1, v_i2, v_s3]))), sym.Function(str(Term([v_i1, v_s2, v_i3])))
+beta, gamma = 0.7, 0.1
 # Initial conditions
-no = 0.1
-yes = 0.9
-IV = {S1(0): no, S2(0): yes, S3(0): yes, I1(0): yes, I2(0): no, I3(0): no}
-IV[S1I2(0)] = IV[S1(0)] * IV[S2(0)]
-IV[I1S2(0)] = IV[I1(0)] * IV[S2(0)]
-IV[S1I3(0)] = IV[S1(0)] * IV[I3(0)]
-IV[I1S3(0)] = IV[I1(0)] * IV[S3(0)]
-IV[S2I3(0)] = IV[S2(0)] * IV[I3(0)]
-IV[I2S3(0)] = IV[I2(0)] * IV[S3(0)]
-IV[S1S2I3(0)] = IV[S1(0)] * IV[S2(0)] * IV[I3(0)]
-IV[S1I2S3(0)] = IV[S1(0)] * IV[I2(0)] * IV[S3(0)]
-IV[S1I2I3(0)] = IV[S1(0)] * IV[I2(0)] * IV[I3(0)]
-IV[I1S2S3(0)] = IV[I1(0)] * IV[S2(0)] * IV[S3(0)]
-IV[I1I2S3(0)] = IV[I1(0)] * IV[I2(0)] * IV[S3(0)]
-IV[I1S2I3(0)] = IV[I1(0)] * IV[S2(0)] * IV[I3(0)]
+no = 0.0
+yes = 1.0
 
-functions = [S1(t), S2(t), S3(t), I1(t), I2(t), I3(t),
-             S1I2(t), I1S2(t), S1I3(t), I1S3(t), S2I3(t), I2S3(t),
-             S1S2I3(t), S1I2S3(t), S1I2I3(t), I1S2S3(t), I1I2S3(t), I1S2I3(t)]
+graph = nx.cycle_graph(3)
+# 0 is infected, others susceptible
 
-beta, gamma = 0.8, 0.2
-triangle_generated = generate_equations(nx.cycle_graph(3), get_SIR(beta, gamma))
+full_equations = generate_equations(graph, get_SIR(beta, gamma))
 equations = []
-for list_of_eqn in triangle_generated.values():
+for list_of_eqn in full_equations.values():
     for eqn in list_of_eqn:
         print(eqn)
         equations.append(eqn)
+t_max = 10
+
+LHS = []
+for list_of_eqn in full_equations.values():
+    for each_eqn in list_of_eqn:
+        LHS.append(sym.Integral(each_eqn.lhs).doit())
+
+IV = initial_conditions(graph.nodes, LHS, [0])
+print(IV)
+print(len(IV))
 
 
 def get_numerical_sol_from_generated():
     plt.clf()
     print('\npassing equations and ICs into numerical solver...')
-    sol = solve(triangle_generated, nx.cycle_graph(3), init_cond=IV, t_max=10, step=5e-2, atol=1e-4, rtol=1e-4,
+    sol = solve(full_equations, graph, init_cond=IV, t_max=t_max, step=1e-1, atol=1e-8, rtol=1e-9,
                 print_option='full')
     print(sol['message'])
     final_vals = []
@@ -74,17 +57,19 @@ def get_numerical_sol_from_generated():
 
 
 def plot_numerical(sol):
+    plt.clf()
     plt.plot(sol.t, sol.y[0],
              label=f'${sym.Integral(equations[0].lhs).doit()}$'.replace('\u3008', '[').replace('\u3009', ']'))
     for i in range(1, len(equations)):
         plt.plot(sol.t, sol.y[i],
                  label=f'${sym.Integral(equations[i].lhs).doit()}$'.replace('\u3008', '[').replace('\u3009', ']'))
-    plt.title("Numerical solution to triangle system")
+    plt.title("Numerical solution to $C_5$ system")
     plt.xlabel("Time")
     plt.ylabel("Probability")
     plt.legend()
+    plt.axis([0, t_max, 0, 1])
+    # plt.ylim([0, 1])
     plt.size = (10, 8)
-    plt.ylim([0, 1])
     plt.tight_layout()
     plt.savefig('test-num.png')
     plt.show()
@@ -98,14 +83,14 @@ def get_analytic_sol_from_generated():
     plt.clf()
     print(f'\npassing {len(equations)} equations and ICs into analytic solver...')
     start = time()
-    sol = sym.solvers.ode.systems.dsolve_system(eqs=equations, funcs=functions, t=t, ics=IV)[0]
+    sol = sym.solvers.ode.systems.dsolve_system(eqs=equations, funcs=LHS, t=t, ics=IV)[0]
     print(f'solved in {time() - start}s!')
     print(sol)
     at_ten = []
     for eq in sol:
-        at_ten.append(eq.subs(t, 10))
+        at_ten.append(eq.subs(t, t_max))
     print(at_ten)
-    print('analytic solution:\n', sol)
+    print('analytic solution:\n', [round(y.rhs, 3) for y in at_ten])
     plot_analytic(sol)
 
 
@@ -116,14 +101,16 @@ def plot_analytic(sol):
                  legend=True, show=False)
     for i in range(1, len(equations)):
         p.extend(sym.plot(sol[i].rhs, t_range,
-                          label=f'${sym.Integral(equations[i].lhs).doit()}$'.replace('\u3008', '[').replace('\u3009', ']'),
+                          label=f'${sym.Integral(equations[i].lhs).doit()}$'.replace('\u3008', '[').replace('\u3009',
+                                                                                                            ']'),
                           legend=True, show=False))
-    p.title = "Analytic solution to triangle system"
+    p.title = "Analytic solution to $C_5$ system"
     p.x_label = "Time"
     p.y_label = "Probability"
     p.size = (10, 8)
     p.save('test-exact.png')
     p.show()
+    plt.axis([0, t_max, 0, 1])
     plt.tight_layout()
     plt.clf()
 

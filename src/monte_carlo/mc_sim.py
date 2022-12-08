@@ -189,7 +189,7 @@ def numerical_solve(model, beta, graph, t, t_max):
         print(e)
     print(f'\ntime to get {len(set().union(*equations.values()))} equations: {generate}')
     LHS = [sym.Integral(each.lhs).doit() for each in set().union(*equations.values())]
-    init_cond = initial_conditions(list(graph.nodes), list(LHS), choice=9, beta=beta, symbol=t)
+    init_cond = initial_conditions(list(graph.nodes), list(LHS), choice=9, symbol=t)
     init_cond_for_analytic = dict()
     for i in init_cond:
         init_cond_for_analytic[i.subs(t, 0)] = round(init_cond[i], 3)
