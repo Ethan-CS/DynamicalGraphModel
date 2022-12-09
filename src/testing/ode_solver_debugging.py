@@ -5,6 +5,7 @@ import sympy as sym
 import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
+from sympy.solvers.ode.systems import dsolve_system
 
 from equation import generate_equations, get_SIR, Term, Vertex, solve, initial_conditions
 
@@ -17,36 +18,33 @@ sns.set_style("ticks")
 
 t = sym.symbols('t')
 beta, gamma = 0.7, 0.1
-# Initial conditions
-no = 0.0
-yes = 1.0
 
-graph = nx.cycle_graph(3)
-# 0 is infected, others susceptible
+graph = nx.cycle_graph(4)
 
-full_equations = generate_equations(graph, get_SIR(beta, gamma))
+full_equations = generate_equations(graph, get_SIR(beta, gamma), closures=True)
 equations = []
 for list_of_eqn in full_equations.values():
     for eqn in list_of_eqn:
         print(eqn)
         equations.append(eqn)
 t_max = 10
+print('number of equations:', len(equations))
 
 LHS = []
 for list_of_eqn in full_equations.values():
     for each_eqn in list_of_eqn:
         LHS.append(sym.Integral(each_eqn.lhs).doit())
 
-IV = initial_conditions(graph.nodes, LHS, [0])
-print(IV)
-print(len(IV))
+functions = [sym.Function(str(type(f)))(t) for f in list(LHS)]
+print('number of functions:', len(functions))
+IV = initial_conditions(list(graph.nodes), LHS, [0])
+print(f'initial conditions:\n{IV}')
 
 
 def get_numerical_sol_from_generated():
-    plt.clf()
+    # plt.clf()
     print('\npassing equations and ICs into numerical solver...')
-    sol = solve(full_equations, graph, init_cond=IV, t_max=t_max, step=1e-1, atol=1e-8, rtol=1e-9,
-                print_option='full')
+    sol = solve(full_equations, graph, init_cond=IV, t_max=t_max, step=1e-1, rtol=1e-9, atol=1e-8, print_option='full')
     print(sol['message'])
     final_vals = []
     for i in sol.y:
@@ -57,13 +55,13 @@ def get_numerical_sol_from_generated():
 
 
 def plot_numerical(sol):
-    plt.clf()
+    # plt.clf()
     plt.plot(sol.t, sol.y[0],
              label=f'${sym.Integral(equations[0].lhs).doit()}$'.replace('\u3008', '[').replace('\u3009', ']'))
     for i in range(1, len(equations)):
         plt.plot(sol.t, sol.y[i],
                  label=f'${sym.Integral(equations[i].lhs).doit()}$'.replace('\u3008', '[').replace('\u3009', ']'))
-    plt.title("Numerical solution to $C_5$ system")
+    plt.title(f"Numerical solution to $C_{len(graph.nodes)}$ system")
     plt.xlabel("Time")
     plt.ylabel("Probability")
     plt.legend()
@@ -80,17 +78,15 @@ def plot_numerical(sol):
 # Get the solver working with hard-coded equation. If can’t, do a
 # careful comparison of approach versus original examples to see why.
 def get_analytic_sol_from_generated():
-    plt.clf()
     print(f'\npassing {len(equations)} equations and ICs into analytic solver...')
     start = time()
-    sol = sym.solvers.ode.systems.dsolve_system(eqs=equations, funcs=LHS, t=t, ics=IV)[0]
-    print(f'solved in {time() - start}s!')
-    print(sol)
+    sol = dsolve_system(eqs=equations, funcs=functions, t=t, ics=IV)[0]
+    print(f'solved in {time() - start}s!\n{sol}')
+
     at_ten = []
-    for eq in sol:
-        at_ten.append(eq.subs(t, t_max))
-    print(at_ten)
-    print('analytic solution:\n', [round(y.rhs, 3) for y in at_ten])
+    # for eq in sol:
+    #     at_ten.append(eq.subs(t, t_max))
+    # print('analytic solution:\n', [round(y.rhs, 3) for y in at_ten])
     plot_analytic(sol)
 
 
@@ -104,7 +100,7 @@ def plot_analytic(sol):
                           label=f'${sym.Integral(equations[i].lhs).doit()}$'.replace('\u3008', '[').replace('\u3009',
                                                                                                             ']'),
                           legend=True, show=False))
-    p.title = "Analytic solution to $C_5$ system"
+    p.title = f"Analytic solution to $C_{len(graph.nodes)}$ system"
     p.x_label = "Time"
     p.y_label = "Probability"
     p.size = (10, 8)

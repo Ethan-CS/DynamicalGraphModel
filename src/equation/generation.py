@@ -31,7 +31,7 @@ def get_single_equations(g, model):
     for state in dynamically_relevant(model):
         for node in g.nodes:
             term = Term([Vertex(state, node)])
-            lhs.append(sym.Function(str(term))(sym.symbols('t')))
+            lhs.append(sym.Function(str(term)))
             singles_equations[1].append(sym.Eq(sym.Derivative(sym.Function(str(term))(t)), chain_rule(term, g, model)))
     return singles_equations, lhs
 
@@ -85,24 +85,32 @@ def get_specified_equations(terms, equations, lhs_terms, g, model, closures):
         term = Term(term)
         # If term is up to length we're considering and not already in system, add equation for it
         new_term = term.function()
+        t = sym.symbols('t')
         if new_term not in lhs_terms:
             if not closures or (closures and not can_be_closed(term, g)):
                 eq_rhs = chain_rule(term, g, model, closures)
-                next_equation = sym.Eq(sym.Derivative(term.function()(sym.symbols('t'))), eq_rhs)
+                next_equation = sym.Eq(sym.Derivative(term.function()(t)), eq_rhs)
                 equations[len(str(term).split(" "))].append(next_equation)
                 lhs_terms.append(new_term)
         elif can_be_closed(term, g):
             closure_terms = replace_with_closures(term.function(), g)
             for sub_term in closure_terms:
-                if sub_term not in lhs_terms:
-                    next_from_closures = sym.Eq(sym.Derivative(sub_term.function()(sym.symbols('t'))),
-                                                chain_rule(sub_term, g, model, closures))
+                if '/' in str(sub_term):
+                    sub_term = Term(str(1/sub_term))
+                if type(sub_term) is not Term:
+                    sub_term = Term(sub_term)
+                fn = sub_term.function()
+                if fn not in lhs_terms and fn(t) not in lhs_terms:
+                    next_from_closures = sym.Eq(sym.Derivative(fn(t)), chain_rule(sub_term, g, model, closures))
                     equations[len(str(sub_term).split(" "))].append(next_from_closures)
-                    lhs_terms.append(sym.Function(str(sub_term.function()))(t))
+                    lhs_terms.append(fn)
 
 
 def get_rhs_terms(equations, length, lhs):
-    rhs_expressions = [each.rhs for each in set().union(equations[length], equations[length-1])]
+    if length > 1:
+        rhs_expressions = [each.rhs for each in set().union(equations[length], equations[length-1])]
+    else:
+        rhs_expressions = [each.rhs for each in equations[length]]
     rhs = set()
     for expr in rhs_expressions:
         rhs.update([f for f in expr.atoms(sym.Function) if f not in lhs])

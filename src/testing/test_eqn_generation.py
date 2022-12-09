@@ -40,11 +40,10 @@ def test_get_single_equations():
     expected_terms = []
     size = 10
     for i in range(0, size):
-        expected_terms.append(sym.Derivative(Term([Vertex('S', i)]).function()(t)))
-        expected_terms.append(sym.Derivative(Term([Vertex('I', i)]).function()(t)))
+        expected_terms.append(Term([Vertex('S', i)]).function())
+        expected_terms.append(Term([Vertex('I', i)]).function())
 
-    actual_terms = get_single_equations(nx.erdos_renyi_graph(n=size, p=0.2), SIR)
-    lhs_terms = [each.lhs for each in actual_terms]
+    actual_terms, lhs_terms = get_single_equations(nx.erdos_renyi_graph(n=size, p=0.2), SIR)
     for term in lhs_terms:
         assert term in expected_terms, f'Expected {str(term)} in actual terms, was not there'
 
@@ -56,10 +55,16 @@ def test_path_equations():
     for i in range(1, 10):
         path = networkx.path_graph(i)
         equations = generation.generate_equations(path, SIR)
+        all_equations = []
+        for each_len in equations:
+            for eqn in equations[each_len]:
+                all_equations.append(eqn)
+        print(*all_equations, sep='\n')
         closed_equations = generation.generate_equations(path, SIR, closures=True)
 
-        assert len(equations) == int((3 * i * i - i + 2) / 2), f'incorrect number of equations for full system for ' \
-                                                               f'path on {i} vertices'
+        assert len(all_equations) == int((3 * i * i - i + 2) / 2), \
+            f'incorrect number of equations for full system for path on {i} vertices.\nGot {len(all_equations)}, ' \
+            f'expected {int((3 * i * i - i + 2) / 2)}.'
         if i > 3:
             assert len(closed_equations) == 5 * i - 3, 'incorrect number of equations for closed system for ' \
                                                        f'path on {i}\n{[each.lhs for each in closed_equations]}'
@@ -106,3 +111,5 @@ def run_all():
     test_get_single_equations()
     test_path_equations()
     test_triangle_equations()
+
+run_all()

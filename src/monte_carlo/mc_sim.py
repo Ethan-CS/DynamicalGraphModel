@@ -194,7 +194,7 @@ def numerical_solve(model, beta, graph, t, t_max):
     for i in init_cond:
         init_cond_for_analytic[i.subs(t, 0)] = round(init_cond[i], 3)
     print(f'\nInitial conditions:\n{init_cond_for_analytic}\n')
-    numerical_solution = solve(equations, graph, init_cond=init_cond, t_max=t_max, step=0.01, atol=1, rtol=1,
+    numerical_solution = solve(equations, graph, init_cond=init_cond, t_max=t_max, step=0.01, rtol=1, atol=1,
                                print_option='full')
     print(f'\n{numerical_solution["message"]}')
     analytic = False

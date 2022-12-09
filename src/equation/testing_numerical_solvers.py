@@ -24,13 +24,14 @@ matplotlib.use('TkAgg')  # Avoids an annoying error on macOS
 def scipy_solve():
     print('setting up')
     st = time()
-    g = nx.random_tree(10)
+    g = nx.random_tree(4)
     full_equations = generate_equations(g, get_SIR(), closures=False)
     print(f'{len(full_equations)} equations generated in {time() - st}s')
     solve(full_equations, g)
+    print('solved')
 
 
-def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol=0.1, atol=0.1, print_option='none'):
+def solve(full_equations, g, init_cond=None, t_max=10, step=1e-2, rtol=1e-4, atol=1e-6, print_option='none'):
     LHS, RHS = [], []
     for list_of_eqn in full_equations.values():
         for each_eqn in list_of_eqn:
@@ -54,12 +55,12 @@ def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol
             derivatives.append(r_sub)  # indices should be consistent over LHS, y_vec and derivatives
         return derivatives
 
+    y0 = []
     if init_cond is None:
-        # st = time()
-        y0 = list(initial_conditions(list(g.nodes), list(LHS), symbol=sym.symbols('t')).values())
-        # print(f'got initial conditions in {time() - st}s')
-    else:
-        y0 = list(init_cond.values())
+        init_cond = initial_conditions(list(g.nodes), list(LHS), symbol=sym.symbols('t'))
+
+    for each in LHS:  # another bug found here - discrepancy between indexing in init conditions and other lists
+        y0.append(init_cond[each.subs(sym.symbols('t'), 0)])
 
     st = time()
     y_out = solve_ivp(rhs, (0, t_max), y0, method="Radau", max_step=step, rtol=rtol, atol=atol)
@@ -103,3 +104,4 @@ def integration_summary(info):
                   '1: adams (nonstiff), 2: bdf (stiff)'
         s += f'{msg}:\n{info[i]}'
     s += '\n=' * 32
+
