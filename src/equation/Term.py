@@ -28,7 +28,7 @@ class Term:
         assert type(_vertices) == list, f'Vertex set must be a list, you provided:' \
                                         f'\nVertex set: {_vertices}, type: {type(_vertices)}'
         for v in _vertices:
-            assert type(v) == Vertex, 'not all entries in provided list were vertices'
+            assert type(v) == Vertex, f'not all entries in provided list were vertices: {v}'
         self._vertices = _vertices
 
     def __str__(self):

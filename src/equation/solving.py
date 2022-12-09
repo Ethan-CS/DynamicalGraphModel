@@ -9,8 +9,8 @@ from equation.generation import format_term
 def initial_conditions(nodes, functions, choice=None, num_initial_infected=1, symbol=0):
     initial_values = {}
     for node in list(nodes):
-        initial_values[sym.Function(str(Vertex('S', node)))(symbol)] = 1.0
-        initial_values[sym.Function(str(Vertex('I', node)))(symbol)] = 0.0
+        initial_values[sym.Function(str(Vertex('S', node)))(symbol)] = 0.999
+        initial_values[sym.Function(str(Vertex('I', node)))(symbol)] = 0.001
     if choice is not None and type(choice) is list:
         num_initial_infected = len(choice)
 
@@ -19,10 +19,11 @@ def initial_conditions(nodes, functions, choice=None, num_initial_infected=1, sy
             initial_infected = random.choice(nodes)
         else:
             initial_infected = choice[i]
-        initial_values[sym.Function(str(Vertex('S', initial_infected)))(symbol)] = 0.0
+        initial_values[sym.Function(str(Vertex('S', initial_infected)))(symbol)] = 0.001
         initial_values[sym.Function(str(Vertex('I', initial_infected)))(symbol)] = 1.0
 
     for f in list(functions):
+        f = f.subs(sym.symbols('t'), symbol)
         formatted = format_term(str(f).split('\u3009')[0])
         split = formatted.split(" ")
         split = [x for x in split if x != '']
@@ -30,7 +31,8 @@ def initial_conditions(nodes, functions, choice=None, num_initial_infected=1, sy
             formatted = sym.Function(str('\u3008' + split[0] + '\u3009'))(symbol)
             initial_values[f] = initial_values[formatted]
             for i in range(1, len(split)):
-                initial_values[f] *= initial_values[sym.Function(str('\u3008' + split[i] + '\u3009'))(symbol)]
+                initial_values[f] *=\
+                    initial_values[sym.Function(str('\u3008' + split[i] + '\u3009'))(symbol)]
 
     return initial_values
 

@@ -70,6 +70,6 @@ def replace_with_closures(term: Term, graph: Graph):
             sub_terms.append(sym.Function(str(Term(as_vertices)))(sym.symbols('t')))
         else:
             # There are remaining cut-vertices in the term, so close the term on those too
-            sub_terms.append(replace_with_closures(Term(as_vertices), graph))
+            sub_terms.extend(replace_with_closures(Term(as_vertices), graph))
 
     return sub_terms

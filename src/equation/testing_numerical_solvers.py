@@ -24,10 +24,11 @@ matplotlib.use('TkAgg')  # Avoids an annoying error on macOS
 def scipy_solve():
     print('setting up')
     st = time()
-    g = nx.random_tree(10)
+    g = nx.random_tree(4)
     full_equations = generate_equations(g, get_SIR(), closures=False)
     print(f'{len(full_equations)} equations generated in {time() - st}s')
     solve(full_equations, g)
+    print('solved')
 
 
 def solve(full_equations, g, init_cond=None, beta=0.75, t_max=10, step=0.1, rtol=0.1, atol=0.1, print_option='none'):
@@ -103,3 +104,4 @@ def integration_summary(info):
                   '1: adams (nonstiff), 2: bdf (stiff)'
         s += f'{msg}:\n{info[i]}'
     s += '\n=' * 32
+
