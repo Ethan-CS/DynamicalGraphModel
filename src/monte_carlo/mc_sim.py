@@ -9,8 +9,7 @@ import pandas as pd
 import sympy as sym
 
 from matplotlib import pyplot as plt
-from equation import generate_equations, initial_conditions, Vertex
-from equation.testing_numerical_solvers import solve
+from equation import generate_equations, initial_conditions, Vertex, solve
 from model_params.cmodel import CModel, get_SIR
 
 matplotlib.use('module://backend_interagg')

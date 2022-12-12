@@ -6,14 +6,13 @@ import sympy as sym
 from equation import generation, closing
 from equation.Term import Term, Vertex
 from equation.generation import get_single_equations, generate_equations
-from equation.solving import initial_conditions, solve_equations
-from equation.testing_numerical_solvers import solve
+from equation.solving import initial_conditions, solve_equations, solve
 from equation_MC_comparison import measure_generation_runtimes
 from model_params.cmodel import get_SIR
 
 
 def main():
-    # measure_runtimes()
+    measure_runtimes()
     print('starting')
     i = 5
     path = nx.path_graph(i)
@@ -28,10 +27,10 @@ def main():
 
 
 def measure_runtimes():
-    with open(f'data/path_data.csv', 'w') as f:
-        for i in range(1, 11):
+    with open(f'/Users/ethanhunter/PycharmProjects/DynamicalGraphModel/src/data/path_data.csv', 'w') as f:
+        for i in range(1, 6):
             print(f'i={i}')
-            measure_generation_runtimes(g=nx.path_graph(i), num_iter=10, timeout=100, f=f)
+            measure_generation_runtimes(g=nx.path_graph(i), num_iter=10, timeout=100, f=f, solve=True)
     with open(f'data/random_tree_data.csv', 'w') as f:
         for i in range(1, 11):
             print(f'i={i}')

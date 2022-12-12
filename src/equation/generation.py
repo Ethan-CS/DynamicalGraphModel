@@ -85,25 +85,25 @@ def get_specified_equations(terms, equations, lhs_terms, g, model, closures):
         term = Term(term)
         # If term is up to length we're considering and not already in system, add equation for it
         new_term = term.function()
-        t = sym.symbols('t')
+        time = sym.symbols('t')
         if new_term not in lhs_terms:
             if not closures or (closures and not can_be_closed(term, g)):
                 eq_rhs = chain_rule(term, g, model, closures)
-                next_equation = sym.Eq(sym.Derivative(term.function()(t)), eq_rhs)
+                next_equation = sym.Eq(sym.Derivative(term.function()(time)), eq_rhs)
                 equations[len(str(term).split(" "))].append(next_equation)
                 lhs_terms.append(new_term)
-        elif can_be_closed(term, g):
-            closure_terms = replace_with_closures(term.function(), g)
-            for sub_term in closure_terms:
-                if '/' in str(sub_term):
-                    sub_term = Term(str(1/sub_term))
-                if type(sub_term) is not Term:
-                    sub_term = Term(sub_term)
-                fn = sub_term.function()
-                if fn not in lhs_terms and fn(t) not in lhs_terms:
-                    next_from_closures = sym.Eq(sym.Derivative(fn(t)), chain_rule(sub_term, g, model, closures))
-                    equations[len(str(sub_term).split(" "))].append(next_from_closures)
-                    lhs_terms.append(fn)
+            elif can_be_closed(term, g):
+                closure_terms = replace_with_closures(term.function(), g)
+                for sub_term in closure_terms:
+                    if '/' in str(sub_term):
+                        sub_term = Term(str(1/sub_term))
+                    if type(sub_term) is not Term:
+                        sub_term = Term(sub_term)
+                    fn = sub_term.function()
+                    if fn not in lhs_terms and fn(time) not in lhs_terms:
+                        next_from_closures = sym.Eq(sym.Derivative(fn(time)), chain_rule(sub_term, g, model, closures))
+                        equations[len(str(sub_term).split(" "))].append(next_from_closures)
+                        lhs_terms.append(fn)
 
 
 def get_rhs_terms(equations, length, lhs):
@@ -205,7 +205,7 @@ def derive(v: Vertex, term_without_v: Term, g: Graph, model: CModel, closures=Fa
                 cleaned = re.sub("[-.+*\u3008\u3009(t)]", "", term_as_string)
                 vertices = [Vertex(v[0], int(v[1:])) for v in cleaned.split()]
                 actual_term = Term(vertices)
-                if not can_be_closed(actual_term, graph):
+                if not can_be_closed(actual_term, graph) or not closures:
                     all_expressions += each_term
                     all_terms.append(each_term)
                 else:
