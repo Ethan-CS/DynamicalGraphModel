@@ -14,8 +14,8 @@ matplotlib.use('TkAgg')
 
 
 # Used to produce a scatter plot comparing the time performance of two methods that achieve the same result
-def scatter_compare_two_methods(data, x_filter, y_filter, title='', x_label='', y_label=''):
-    g = sns.scatterplot(data=data, x=data[x_filter], y=data[y_filter], hue=data['winner'])
+def scatter_compare_two_methods(data, x_filter, y_filter, title='', x_label='', y_label='', hue=None):
+    g = sns.scatterplot(data=data, x=data[x_filter], y=data[y_filter], hue=data['winner'] if hue is None else hue)
 
     plot_style(max_val_for_axes(data, x_filter, y_filter), title, x_label, y_label)
 
@@ -41,8 +41,8 @@ def plot_style(max_val, title, x_label, y_label):
 
 
 def main():
-    plot_averages(pd.read_csv(f'data/path_data.csv'), pd.read_csv(f'data/cycle_data.csv'), pd.read_csv(f'data/tree_data.csv'))
-    plot_full_vs_closures(['tree'])
+    # plot_averages(pd.read_csv(f'data/path_data.csv'), pd.read_csv(f'data/cycle_data.csv'), pd.read_csv(f'data/tree_data.csv'))
+    plot_full_vs_closures(['path'])
 
 
 def plot_averages(cycle_data, path_data, tree_data):
@@ -55,12 +55,12 @@ def plot_averages(cycle_data, path_data, tree_data):
         full_results, closed_results = {}, {}
         full_averages, closed_averages = [], []
         for index, row in data.iterrows():
-            if row['number of vertices'] not in full_results.keys():
-                full_results[int(row['number of vertices'])] = []
-            if row['number of vertices'] not in closed_results.keys():
-                closed_results[int(row['number of vertices'])] = []
-            full_results[row['number of vertices']].append(row['time (full)'])
-            closed_results[row['number of vertices']].append(row['time (closed)'])
+            if row['num of vertices'] not in full_results.keys():
+                full_results[int(row['num of vertices'])] = []
+            if row['num of vertices'] not in closed_results.keys():
+                closed_results[int(row['num of vertices'])] = []
+            full_results[row['num of vertices']].append(row['time (full)'])
+            closed_results[row['num of vertices']].append(row['time (closed)'])
         for entry in full_results:
             avg = sum(full_results[entry]) / len(full_results[entry])
             full_averages.append(avg)
@@ -100,13 +100,13 @@ def plot_full_vs_closures(graphs: list):
         print(data)
 
         # Define title and labels for axes
-        title = f'Time to generate equations for $SIR$ models\n on {"random " + g + "s" if g == "tree" else g + "s"} ' \
-                f'up to {data.iloc[-1]["number of vertices"]} vertices.'
+        title = f'Time to generate and solve equations for $SIR$ models\n on {"random " + g + "s" if g == "tree" else g + "s"} ' \
+                f'up to {data.iloc[-1]["num of vertices"]} vertices.'
 
         # Send to scatter plot function to compare performance
         scatter_compare_two_methods(data, x_filter='time (full)', y_filter='time (closed)', title=title,
-                                    x_label='Time for full system', y_label='Time for closed system'
-                                    ).savefig(f'data/plots/{g}_time.png')
+                                    x_label='Time for full system', y_label='Time for closed system', hue=time_winners)\
+            .savefig(f'data/plots/{g}_time.png')
 
 
 if __name__ == "__main__":

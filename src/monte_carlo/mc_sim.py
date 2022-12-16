@@ -55,7 +55,7 @@ def example_monte_carlo(to_avg=False):
         print('Running to average:')
         results_1 = run_to_average(tree, model, init_state, t_max, tolerance=1e-3, num_rounds=100)
         last_1 = [results_1[i].mean() for i in results_1.columns]
-        print('final average:', last_1)
+        print(f'final average for t=:{t_max}', last_1)
         print(results_1.tail(1))
         results_1.plot()
         plt.show()
@@ -65,9 +65,6 @@ def example_monte_carlo(to_avg=False):
         print('Solved to average:', last_2)
         to_avg.plot()
         plt.show()
-        diff = [abs(last_1[i] - last_2[i]) / ((last_1[i] + last_2[i]) / 2) for i in range(len(last_1))]
-        print(diff)
-        print([diff[i] < tol for i in range(len(diff))])
 
 
 def set_initial_state(model, tree, choice=None):
@@ -84,7 +81,9 @@ def set_initial_state(model, tree, choice=None):
 def run_to_average(graph, model, init_state, t_max, solution=None, tolerance=0.1, timeout=60, num_rounds=10):
     solution_range = []
     if solution is not None:
-        solution_range = [(s - tolerance, s + tolerance) for s in list(solution.values())]
+        print('solution:', solution)
+        sol = list(solution.values()) if type(solution) == dict else list(solution)
+        solution_range = [(s - tolerance, s + tolerance) for s in sol]
     head = [i for i in range(len(init_state))]
     results = pd.DataFrame(columns=head, dtype=object)
     averages = pd.DataFrame(columns=[i for i in range(len(init_state))], dtype=object)
@@ -128,16 +127,15 @@ def try_run_to_avg():
     t_max = 5
     num_rounds = 100
 
-    # soln = numerical_solve(model, beta, graph, t, t_max)
-    soln = [0.59, 0.66, 0.73, 0.77, 0.67, 0.33, 0, 0, 0, 0, 0]
+    soln = numerical_solve(model, beta, graph, t, t_max)
+    # soln = [0.59, 0.66, 0.73, 0.77, 0.67, 0.33, 0, 0, 0, 0, 0]
 
-    print(f'hard-coded solution:\n{soln}')
+    print(f'solution:\n{soln}')
 
     target_for_mc = {}
     for i in range(graph.number_of_nodes()):
         fun = sym.Function(str(Vertex('I', i)))(t)
-        val = soln[i]
-        target_for_mc[fun] = val
+        target_for_mc[fun] = soln[fun]
 
     choice = 0
     print('\ninitial infected:', choice)
@@ -188,7 +186,7 @@ def numerical_solve(model, beta, graph, t, t_max):
         print(e)
     print(f'\ntime to get {len(set().union(*equations.values()))} equations: {generate}')
     LHS = [sym.Integral(each.lhs).doit() for each in set().union(*equations.values())]
-    init_cond = initial_conditions(list(graph.nodes), list(LHS), choice=9, symbol=t)
+    init_cond = initial_conditions(list(graph.nodes), list(LHS), choice=[9], symbol=t)
     init_cond_for_analytic = dict()
     for i in init_cond:
         init_cond_for_analytic[i.subs(t, 0)] = round(init_cond[i], 3)
@@ -197,15 +195,7 @@ def numerical_solve(model, beta, graph, t, t_max):
                                print_option='full')
     print(f'\n{numerical_solution["message"]}')
     analytic = False
-    try:
-        analytical_solution = sym.solvers.ode.systems.dsolve_system(eqs=set().union(*equations.values()), funcs=LHS,
-                                                                    t=t, ics=init_cond_for_analytic)
-        print(f'\nAnalytical solution:\n{analytical_solution}')
-        soln = dict(zip(init_cond.keys(), analytical_solution[-1]))
-        analytic = True
-    except NotImplementedError:
-        soln = dict(zip(init_cond.keys(), numerical_solution['y'][-1].tolist()))
-        print('\nCould not solve system analytically.')
+    soln = dict(zip(init_cond.keys(), numerical_solution['y'][-1].tolist()))
     print(f'solution:\n{soln}')
     all_equations = []
     for e in equations:

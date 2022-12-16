@@ -11,13 +11,13 @@ from model_params.cmodel import get_SIR
 def measure_generation_runtimes(g, num_iter=10, model=get_SIR(), timeout=60, f=sys.stdout, solve=False,
                                 closures_only=False, t_max=10):
     original_stdout = sys.stdout  # Save a reference to the original standard output
-    sys.stdout = f  # Change the standard output to the file we created.
-    print(f'number of vertices,{"number equations (full),time (full)," if not closures_only else ""}'
-          f'num equations (closed),time (closed)')
-    sys.stdout = original_stdout  # Reset the standard output to its original value
+    # sys.stdout = f  # Change the standard output to the file we created.
+    # print(f'number of vertices,{"number equations (full),time (full)," if not closures_only else ""}'
+    #       f'num equations (closed),time (closed)')
+    # sys.stdout = original_stdout  # Reset the standard output to its original value
     for _ in range(0, num_iter):
         print(f'iter {_ + 1} of {num_iter}')
-        full_equations = []
+        full_equations = {}
         full_time_taken = 0
         if not closures_only:
             full_start = datetime.now()
@@ -36,10 +36,10 @@ def measure_generation_runtimes(g, num_iter=10, model=get_SIR(), timeout=60, f=s
 
         sys.stdout = f  # Change the standard output to the file we created.
         if not closures_only:
-            print(f'{len(g.nodes())},{len(full_equations)},{full_time_taken.seconds}.{full_time_taken.microseconds},'
-                  f'{len(closed_equations)},{closed_time_taken.seconds}.{closed_time_taken.microseconds}')
+            print(f'{len(g.nodes())},{len(list(set().union(*full_equations.values())))},{full_time_taken.seconds}.{full_time_taken.microseconds},'
+                  f'{len(list(set().union(*closed_equations.values())))},{closed_time_taken.seconds}.{closed_time_taken.microseconds}')
         else:
-            print(f'{len(g.nodes())},{len(closed_equations)},{closed_time_taken.seconds}.'
+            print(f'{len(g.nodes())},{len(list(set().union(*closed_equations.values())))},{closed_time_taken.seconds}.'
                   f'{closed_time_taken.microseconds}')
         sys.stdout = original_stdout  # Reset the standard output to its original value
 

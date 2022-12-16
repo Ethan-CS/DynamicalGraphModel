@@ -17,9 +17,9 @@ sns.set_context('notebook')
 sns.set_style("ticks")
 
 t = sym.symbols('t')
-beta, gamma = 0.5, 0.5
+beta, gamma = 0.5, 0.1
 
-graph = nx.path_graph(3)
+graph = nx.path_graph(5)
 
 full_equations = generate_equations(graph, get_SIR(beta, gamma), closures=False)
 equations = []
@@ -27,7 +27,7 @@ for list_of_eqn in full_equations.values():
     for eqn in list_of_eqn:
         print(eqn)
         equations.append(eqn)
-t_max = 2
+t_max = 10
 print('number of equations:', len(equations))
 
 LHS = []
@@ -39,7 +39,7 @@ functions = [sym.Function(str(type(f)))(t) for f in list(LHS)]
 print('number of functions:', len(functions))
 
 yes, no = 0.9, 0.1
-IV = initial_conditions(list(graph.nodes), LHS, [0], symbol=0, yes=0.5, no=0.5)
+IV = initial_conditions(list(graph.nodes), LHS, [0], symbol=0, yes=0.95, no=0.05)
 print(f'initial conditions:\n{IV}')
 
 
@@ -114,4 +114,4 @@ def plot_analytic(sol):
 
 
 get_analytic_sol_from_generated()
-# get_numerical_sol_from_generated()
+get_numerical_sol_from_generated()

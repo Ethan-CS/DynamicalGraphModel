@@ -51,7 +51,7 @@ def solve_equations(full_equations, init_conditions, graph, t_max):
     functions = [sym.Function(str(type(f)))(sym.symbols('t')) for f in list(LHS)]
 
     return solve(full_equations, graph, init_cond=init_conditions, t_max=t_max, step=1e-1, rtol=1e-9, atol=1e-8,
-                 print_option='full')
+                 print_option='none')
 
 
 def solve(full_equations, g, init_cond=None, t_max=10, step=1e-2, rtol=1e-4, atol=1e-6, print_option='none'):
@@ -82,7 +82,7 @@ def solve(full_equations, g, init_cond=None, t_max=10, step=1e-2, rtol=1e-4, ato
 
     y0 = []
     if init_cond is None:
-        init_cond = initial_conditions(list(g.nodes), list(LHS), symbol=sym.symbols('t'))
+        init_cond = initial_conditions(list(g.nodes), list(LHS))
 
     for each in LHS:  # another bug found here - discrepancy between indexing in init conditions and other lists
         y0.append(init_cond[each.subs(sym.symbols('t'), 0)])
