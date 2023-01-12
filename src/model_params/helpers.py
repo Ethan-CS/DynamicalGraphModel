@@ -24,21 +24,22 @@ def coupling_types(model):
                 # Get the situation under which a transition occurs
                 transition = model.couplings[couple][0].split(':')[0]
                 # Does the transition contain a state we are currently interested in?
-                if transition.count(state) > 0:
+                if model.couplings[couple][0].count(state) > 0:
                     if transition[0] == state:  # EXIT TRANSITION
                         if transition.count('*') > 0:  # NEEDS A NEIGHBOUR
                             _coupling_map[state].append((Coupling.NEIGHBOUR_EXIT, model.couplings[couple][0],
-                                                         model.couplings[couple][1]))
+                                                         model.couplings[couple][1], couple))
                         else:
                             _coupling_map[state].append((Coupling.ISOLATED_EXIT, model.couplings[couple][0],
-                                                         model.couplings[couple][1]))
+                                                         model.couplings[couple][1], couple))
                     else:  # ENTRY TRANSITION
                         if transition.count('*') > 0:  # NEEDS A NEIGHBOUR
                             _coupling_map[state].append((Coupling.NEIGHBOUR_ENTER, model.couplings[couple][0],
-                                                         model.couplings[couple][1]))
+                                                         model.couplings[couple][1], couple))
                         else:
-                            _coupling_map[state].append(Coupling.ISOLATED_ENTER, model.couplings[couple][0],
-                                                        model.couplings[couple][1])
+                            _coupling_map[state].append((Coupling.ISOLATED_ENTER, model.couplings[couple][0],
+                                                        model.couplings[couple][1], couple))
+    # TODO does this look at how you can end up (transition[x][-1]) in this state too?
     return _coupling_map
 
 

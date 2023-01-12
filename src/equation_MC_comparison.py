@@ -6,6 +6,8 @@ import sympy as sym
 from equation import generate_equations
 from equation.solving import solve_equations, initial_conditions
 from model_params.cmodel import get_SIR
+from monte_carlo import run_to_average
+from monte_carlo.mc_sim import set_initial_state
 
 
 def measure_generation_runtimes(g, num_iter=10, model=get_SIR(), timeout=60, f=sys.stdout, solve=False,
@@ -42,6 +44,24 @@ def measure_generation_runtimes(g, num_iter=10, model=get_SIR(), timeout=60, f=s
             print(f'{len(g.nodes())},{len(list(set().union(*closed_equations.values())))},{closed_time_taken.seconds}.'
                   f'{closed_time_taken.microseconds}')
         sys.stdout = original_stdout  # Reset the standard output to its original value
+
+
+def measure_mcmc_runtimes(g, p=0, num_iter=10, model=get_SIR(), timeout=60, f=sys.stdout, t_max=10):
+    original_stdout = sys.stdout  # Save a reference to the original standard output
+
+    for _ in range(0, num_iter):
+        print(f'iter {_ + 1} of {num_iter}')
+        full_start = datetime.now()  # Get the start time
+
+        # Do the MCMC simulation
+        init_state = set_initial_state(model, g)
+        run_to_average(g, model, init_state, t_max, tolerance=1e-3, timeout=60, num_rounds=10)
+        full_time_taken = datetime.now() - full_start
+
+        sys.stdout = f  # print to file
+        print(f'{len(g.nodes())},{f"{p}," if p != 0 else ""}{full_time_taken.seconds}.{full_time_taken.microseconds}')
+        sys.stdout = original_stdout  # Reset the standard output to its original value
+        print(f'vertices: {len(g.nodes())}, time taken: {full_time_taken.seconds}.{full_time_taken.microseconds}')
 
 
 def get_functions_from_equations(equations, symbol=sym.symbols('t')):
