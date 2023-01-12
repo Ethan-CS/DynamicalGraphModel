@@ -36,17 +36,17 @@ def measure_runtimes(graph, num_vertices=10, p=0.05, method='equations'):
 
             # Get the specified graph
             g = None
-            if graph is 'path':
+            if graph == 'path':
                 g = nx.path_graph(i)
-            elif graph is 'cycle':
+            elif graph == 'cycle':
                 g = nx.cycle_graph(i)
-            elif graph is 'random':
+            elif graph == 'random':
                 g = nx.erdos_renyi_graph(i, p)
 
             # Create (and solve) the model
-            if method is 'eq' or 'equations':
+            if method == 'eq' or 'equations':
                 measure_generation_runtimes(g=g, num_iter=10, timeout=20, f=f, solve=True, t_max=5, closures_only=True)
-            elif method is 'mc' or 'mcmc' or 'monte carlo':
+            elif method == 'mc' or 'mcmc' or 'monte carlo':
                 measure_mcmc_runtimes(g, p, 10, CModel.make_SIR(0.5, 0.1), 30, f, 5)
 
 
