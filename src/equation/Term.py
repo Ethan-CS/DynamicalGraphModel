@@ -33,13 +33,24 @@ class Term:
 
     def __str__(self):
         self._vertices.sort()
-        string = "\u3008"
+        string = ""
         for v in self._vertices:
             if type(v) == Vertex:
                 string += f"{v.state}{v.node} "
             else:
                 string += f"{v} "
-        string = string[:-1] + "\u3009"
+        string = "\u3008" + string[:-1] + "\u3009"
+        return string
+
+    def latex_print(self):
+        self._vertices.sort()
+        string = ""
+        for v in self._vertices:
+            if type(v) == Vertex:
+                string += f"{v.state}_{v.node} "
+            else:
+                string += f"{v} "
+        string = "\\langle" + string[:-1] + "\\rangle"
         return string
 
     def add(self, vertex):

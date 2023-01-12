@@ -9,8 +9,8 @@ FitResult = namedtuple('FitResult', ['C', 'y0', 'R2', 'MRPD', 'success'])
 
 def get_SIR(beta=1, gamma=3):
     sir_model = CModel('SIR')
-    sir_model.set_coupling_rate('S*I:S=>I', beta, name='beta')  # Infection rate
-    sir_model.set_coupling_rate('I:I=>R', gamma, name='gamma')  # Recovery rate
+    sir_model.set_coupling_rate('S*I:S=>I', beta, name='\\beta')  # Infection rate
+    sir_model.set_coupling_rate('I:I=>R', gamma, name='\\gamma')  # Recovery rate
     return sir_model
 
 
@@ -659,7 +659,7 @@ class CModel(object):
 
     @staticmethod
     def make_SIR(beta=0.3, gamma=0.2):
-        """Make a SIR model
+        """Make an SIR model
 
         Constructor for an epidemic SIR model
 
