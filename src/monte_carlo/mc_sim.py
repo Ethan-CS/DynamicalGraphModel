@@ -12,7 +12,7 @@ from matplotlib import pyplot as plt
 from equation import generate_equations, initial_conditions, Vertex, solve
 from model_params.cmodel import CModel, get_SIR
 
-matplotlib.use('module://backend_interagg')
+# matplotlib.use('module://backend_interagg')
 
 
 def monte_carlo_sim(graph: nx.Graph, model: CModel, init_state: dict, t_max: int):
