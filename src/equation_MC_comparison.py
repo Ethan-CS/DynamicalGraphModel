@@ -1,4 +1,5 @@
 import sys
+import signal
 from datetime import datetime
 
 import sympy as sym
@@ -8,6 +9,11 @@ from equation.solving import solve_equations, initial_conditions
 from model_params.cmodel import get_SIR
 from monte_carlo import run_to_average
 from monte_carlo.mc_sim import set_initial_state
+
+
+def handler(signum, frame):
+    print("Forever is over!")
+    raise Exception("end of time")
 
 
 def measure_generation_runtimes(g, num_iter=10, model=get_SIR(), timeout=60, f=sys.stdout, solve=False,
@@ -21,19 +27,33 @@ def measure_generation_runtimes(g, num_iter=10, model=get_SIR(), timeout=60, f=s
         print(f'iter {_ + 1} of {num_iter}')
         full_equations = {}
         full_time_taken = 0
+
+        signal.signal(signal.SIGALRM, handler)  # set-up timeout handler
+
         if not closures_only:
             full_start = datetime.now()
-            full_equations = generate_equations(g, model)
-            if solve:
-                init_conditions = initial_conditions(list(g.nodes), get_functions_from_equations(full_equations))
-                solve_equations(full_equations, init_conditions, g, t_max)
+            signal.alarm(timeout)  # if we get past timeout, will break out
+            try:
+                full_equations = generate_equations(g, model)
+                if solve:
+                    init_conditions = initial_conditions(list(g.nodes), get_functions_from_equations(full_equations))
+                    solve_equations(full_equations, init_conditions, g, t_max)
+            except Exception as exc:
+                print(exc)
+            signal.alarm(0)  # Cancel the timer if completed returned before timeout
             full_time_taken = datetime.now() - full_start
 
+        signal.alarm(timeout)  # if we get past timeout, will break out
         closed_start = datetime.now()
-        closed_equations = generate_equations(g, model, closures=True)
-        if solve:
-            init_conditions = initial_conditions(list(g.nodes), get_functions_from_equations(closed_equations))
-            solve_equations(closed_equations, init_conditions, g, t_max)
+        closed_equations = []
+        try:
+            closed_equations = generate_equations(g, model, closures=True)
+            if solve:
+                init_conditions = initial_conditions(list(g.nodes), get_functions_from_equations(closed_equations))
+                solve_equations(closed_equations, init_conditions, g, t_max)
+        except Exception as exc:
+            print(exc)
+        signal.alarm(0)  # Cancel the timer if completed returned before timeout
         closed_time_taken = datetime.now() - closed_start
 
         sys.stdout = f  # Change the standard output to the file we created.

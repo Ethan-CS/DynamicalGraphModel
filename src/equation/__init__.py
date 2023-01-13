@@ -17,15 +17,15 @@ def main():
     for p in np.linspace(0.01, 0.2, 20):
         p = round(p, 2)
         print(f'\n *** p={p} ***')
-        measure_runtimes('random', p=p, method='monte carlo')
-        measure_runtimes('random', p=p, method='equations')
+        measure_runtimes('random', p=p, method='monte carlo', timeout=180)
+        measure_runtimes('random', p=p, method='equations', timeout=180)
 
     # runtime_large_model()
 
 
-def measure_runtimes(graph, num_vertices=10, p=0.05, method='equations'):
+def measure_runtimes(graph, num_vertices=10, p=0.05, method='equations', timeout=100):
     original_stdout = sys.stdout  # Save a reference to the original standard output
-    with open(f'data/{graph}_{method}_data.csv', 'w') as f:
+    with open(f'../data/{graph}_{method.replace(" ", "_")}_data.csv', 'w') as f:
         sys.stdout = f  # Change the standard output to the file we created.
         print(f'number of vertices,{"p," if p != 0 else ""}time to solve')
         sys.stdout = original_stdout  # Reset the standard output to its original value
@@ -45,9 +45,9 @@ def measure_runtimes(graph, num_vertices=10, p=0.05, method='equations'):
 
             # Create (and solve) the model
             if method == 'eq' or 'equations':
-                measure_generation_runtimes(g=g, num_iter=10, timeout=20, f=f, solve=True, t_max=5, closures_only=True)
+                measure_generation_runtimes(g=g, num_iter=10, timeout=timeout, f=f, solve=True, t_max=5, closures_only=True)
             elif method == 'mc' or 'mcmc' or 'monte carlo':
-                measure_mcmc_runtimes(g, p, 10, CModel.make_SIR(0.5, 0.1), 30, f, 5)
+                measure_mcmc_runtimes(g, p, 10, CModel.make_SIR(0.5, 0.1), timeout, f, 5)
 
 
 def runtime_large_model():
