@@ -12,8 +12,7 @@ from monte_carlo.mc_sim import set_initial_state
 
 
 def handler(signum, frame):
-    print("Forever is over!")
-    raise Exception("end of time")
+    raise Exception("TIMEOUT")
 
 
 def measure_generation_runtimes(g, num_iter=10, model=get_SIR(), timeout=60, f=sys.stdout, solve=False,
@@ -73,9 +72,14 @@ def measure_mcmc_runtimes(g, p=0, num_iter=10, model=get_SIR(), timeout=60, f=sy
         print(f'iter {_ + 1} of {num_iter}')
         full_start = datetime.now()  # Get the start time
 
-        # Do the MCMC simulation
-        init_state = set_initial_state(model, g)
-        run_to_average(g, model, init_state, t_max, tolerance=1e-3, timeout=60, num_rounds=10)
+        signal.signal(signal.SIGALRM, handler)  # set-up timeout handler
+        signal.alarm(timeout)  # if we get past timeout, will break out
+        try:
+            # Do the MCMC simulation
+            init_state = set_initial_state(model, g)
+            run_to_average(g, model, init_state, t_max, tolerance=1e-3, timeout=60, num_rounds=10)
+        except Exception as exc:
+            print(exc)
         full_time_taken = datetime.now() - full_start
 
         sys.stdout = f  # print to file
