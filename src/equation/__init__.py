@@ -25,7 +25,11 @@ def main():
 
 def measure_runtimes(graph, num_vertices=10, p=0.05, method='equations', timeout=100):
     original_stdout = sys.stdout  # Save a reference to the original standard output
+<<<<<<< HEAD
     with open(f'../data/{graph}_{method.replace(" ", "_")}_data.csv', 'w') as f:
+=======
+    with open(f'src/data/{graph}_{method}_data.csv', 'w') as f:
+>>>>>>> fatanode-use
         sys.stdout = f  # Change the standard output to the file we created.
         print(f'number of vertices,{"p," if p != 0 else ""}time to solve')
         sys.stdout = original_stdout  # Reset the standard output to its original value
