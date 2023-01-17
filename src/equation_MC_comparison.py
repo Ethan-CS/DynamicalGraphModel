@@ -3,11 +3,12 @@ import sys
 import signal
 from datetime import datetime
 
+import networkx as nx
 import sympy as sym
 
 from equation import generate_equations
 from equation.solving import solve_equations, initial_conditions
-from model_params.cmodel import get_SIR
+from model_params.cmodel import CModel
 from monte_carlo import run_to_average
 from monte_carlo.mc_sim import set_initial_state
 
@@ -53,14 +54,6 @@ def measure_generation_runtimes(g, num_iter, model, timeout, f, solve, closures_
         signal.alarm(0)  # cancel timer if process completed before timeout
         closed_time_taken = datetime.now() - closed_start
 
-        if not closures_only:
-            print(
-                f'{len(g.nodes())},{len(list(set().union(*full_equations.values())))},{full_time_taken.seconds}.{full_time_taken.microseconds},'
-                f'{len(list(set().union(*closed_equations.values())))},{closed_time_taken.seconds}.{closed_time_taken.microseconds}')
-        else:
-            print(f'{len(g.nodes())},{len(list(set().union(*closed_equations.values())))},{closed_time_taken.seconds}.'
-                  f'{closed_time_taken.microseconds}')
-
         sys.stdout = f  # Change the standard output to the file
         if not closures_only:
             print(f'{len(g.nodes())},{len(list(set().union(*full_equations.values())))},{full_time_taken.seconds}.{full_time_taken.microseconds},'
@@ -68,7 +61,6 @@ def measure_generation_runtimes(g, num_iter, model, timeout, f, solve, closures_
         else:
             print(f'{len(g.nodes())},{len(list(set().union(*closed_equations.values())))},{closed_time_taken.seconds}.'
                   f'{closed_time_taken.microseconds}')
-
         sys.stdout = SYS_STDOUT  # Reset the standard output to its original value
 
 
@@ -89,7 +81,6 @@ def measure_mcmc_runtimes(g, p, num_iter, model, timeout, f, t_max):
         full_time_taken = datetime.now() - full_start
         signal.alarm(0)  # cancel timer if process completed before timeout
 
-        print(f'vertices: {len(g.nodes())}, prob.: {p}, time taken: {full_time_taken.seconds}.{full_time_taken.microseconds}')
         sys.stdout = f  # print to file
         print(f'{len(g.nodes())},{f"{p}," if p != 0 else ""}{full_time_taken.seconds}.{full_time_taken.microseconds}')
         sys.stdout = SYS_STDOUT
@@ -101,3 +92,29 @@ def get_functions_from_equations(equations, symbol=sym.symbols('t')):
         for each_eqn in list_of_eqn:
             LHS.append(sym.Integral(each_eqn.lhs).doit())
     return [sym.Function(str(type(f)))(symbol) for f in list(LHS)]
+
+
+def measure_runtimes(graph_type, num_vertices, iterations, p, t_max, method, timeout):
+    sir_model = CModel.make_SIR(0.5, 0.1)
+    with open(f'../data/{graph_type}_{method.replace(" ", "_")}_data.csv', 'w+') as f:
+        sys.stdout = f  # Change the standard output to the file we created.
+        print(f'number of vertices,{"p," if p != 0 else ""}time to solve')
+
+        for i in range(2, num_vertices+1):
+            sys.stdout = SYS_STDOUT
+            print(f'\nnumber of vertices: {i}')
+
+            # Get the specified graph
+            g = None
+            if graph_type == 'path':
+                g = nx.path_graph(i)
+            elif graph_type == 'cycle':
+                g = nx.cycle_graph(i)
+            elif graph_type == 'random':
+                g = nx.erdos_renyi_graph(i, p)
+
+            # Create (and solve) the model
+            if method == 'eq' or method == 'equations':
+                measure_generation_runtimes(g, iterations, sir_model, timeout, f, True, True, t_max)
+            elif method == 'mc' or method == 'mcmc' or method == 'monte carlo':
+                measure_mcmc_runtimes(g, p, iterations, sir_model, timeout, f, t_max)
