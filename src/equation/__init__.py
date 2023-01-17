@@ -5,7 +5,7 @@ import networkx as nx
 import numpy as np
 import sympy as sym
 
-from equation import generation, closing
+from equation import generation, closing, measure_runtimes
 from equation.Term import Term, Vertex
 from equation_MC_comparison import measure_runtimes
 from equation.generation import get_single_equations, generate_equations
