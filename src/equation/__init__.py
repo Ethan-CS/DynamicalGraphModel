@@ -12,46 +12,48 @@ from equation.solving import initial_conditions, solve_equations, solve
 from equation_MC_comparison import measure_generation_runtimes, measure_mcmc_runtimes
 from model_params.cmodel import get_SIR, CModel
 
+SYS_STDOUT = sys.stdout
+
 
 def main():
-    for p in np.linspace(0.01, 0.2, 20):
+    timeout = 10
+    v = 5
+    iterations = 5
+    t_max = 5
+    for p in np.linspace(0.01, 0.2, 4):
         p = round(p, 2)
         print(f'\n *** p={p} ***')
-        measure_runtimes('random', p=p, method='monte carlo', timeout=180)
-        measure_runtimes('random', p=p, method='equations', timeout=180)
-
-    # runtime_large_model()
+        measure_runtimes('random', v, iterations, p, t_max, 'mc', timeout)
+        # measure_runtimes('random', v, iterations, p, t_max, 'equations', timeout)
 
 
-def measure_runtimes(graph, num_vertices=10, p=0.05, method='equations', timeout=100):
-    original_stdout = sys.stdout  # Save a reference to the original standard output
-<<<<<<< HEAD
-    with open(f'../data/{graph}_{method.replace(" ", "_")}_data.csv', 'w') as f:
-=======
-    with open(f'src/data/{graph}_{method}_data.csv', 'w') as f:
->>>>>>> fatanode-use
+def measure_runtimes(graph_type, num_vertices, iterations, p, t_max, method, timeout):
+    sir_model = CModel.make_SIR(0.5, 0.1)
+    with open(f'../data/{graph_type}_{method.replace(" ", "_")}_data.csv', 'w+') as f:
         sys.stdout = f  # Change the standard output to the file we created.
         print(f'number of vertices,{"p," if p != 0 else ""}time to solve')
-        sys.stdout = original_stdout  # Reset the standard output to its original value
 
         for i in range(2, num_vertices+1):
-            sys.stdout = original_stdout
+            sys.stdout = SYS_STDOUT
             print(f'\nnumber of vertices: {i}')
 
             # Get the specified graph
             g = None
-            if graph == 'path':
+            if graph_type == 'path':
                 g = nx.path_graph(i)
-            elif graph == 'cycle':
+            elif graph_type == 'cycle':
                 g = nx.cycle_graph(i)
-            elif graph == 'random':
+            elif graph_type == 'random':
                 g = nx.erdos_renyi_graph(i, p)
+            print(f'params I got: graph={graph_type}, num_vertices={num_vertices} p={p}, method={method}')
 
             # Create (and solve) the model
-            if method == 'eq' or 'equations':
-                measure_generation_runtimes(g=g, num_iter=10, timeout=timeout, f=f, solve=True, t_max=5, closures_only=True)
-            elif method == 'mc' or 'mcmc' or 'monte carlo':
-                measure_mcmc_runtimes(g, p, 10, CModel.make_SIR(0.5, 0.1), timeout, f, 5)
+            if method == 'eq' or method == 'equations':
+                print('Doing equations')
+                measure_generation_runtimes(g, iterations, sir_model, timeout, f, True, True, t_max)
+            elif method == 'mc' or method == 'mcmc' or method == 'monte carlo':
+                print('Doing MCMC')
+                measure_mcmc_runtimes(g, p, iterations, sir_model, timeout, f, t_max)
 
 
 def runtime_large_model():
