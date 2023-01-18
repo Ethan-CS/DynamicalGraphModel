@@ -7,7 +7,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 from sympy.solvers.ode.systems import dsolve_system
 
-from equation import generate_equations, get_SIR, Term, Vertex, solve, initial_conditions
+from equation.generation import generate_equations
+from equation.solving import initial_conditions, solve
+from model_params.cmodel import get_SIR
 
 matplotlib.use('TkAgg')
 

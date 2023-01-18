@@ -3,7 +3,7 @@ import copy
 import networkx
 import numpy as np
 
-from equation import generate_equations
+from equation.generation import generate_equations
 from equation.Term import Term, Vertex
 from equation.closing import can_be_closed
 from model_params.cmodel import get_SIR

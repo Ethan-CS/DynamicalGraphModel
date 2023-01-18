@@ -10,7 +10,7 @@ import sympy as sym
 from equation.generation import generate_equations
 from equation.solving import solve_equations, initial_conditions
 from model_params.cmodel import CModel
-from monte_carlo import run_to_average
+from monte_carlo.mc_sim import run_to_average
 from monte_carlo.mc_sim import set_initial_state
 
 SYS_STDOUT = sys.stdout

@@ -1,16 +1,15 @@
-import sys
-from datetime import datetime
 from time import time
 
-import matplotlib
 import networkx as nx
 import numpy as np
 import pandas as pd
 import sympy as sym
-
 from matplotlib import pyplot as plt
-from equation import generate_equations, initial_conditions, Vertex, solve
+
+from equation.generation import generate_equations
+from equation.solving import initial_conditions, Vertex, solve
 from model_params.cmodel import CModel, get_SIR
+
 
 # matplotlib.use('module://backend_interagg')
 
