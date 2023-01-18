@@ -6,7 +6,7 @@ from datetime import datetime
 import networkx as nx
 import sympy as sym
 
-from equation import generate_equations
+from equation.generation import generate_equations
 from equation.solving import solve_equations, initial_conditions
 from model_params.cmodel import CModel
 from monte_carlo import run_to_average
