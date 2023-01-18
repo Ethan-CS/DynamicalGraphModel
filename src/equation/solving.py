@@ -1,14 +1,11 @@
 import random
 from time import time
 
-import networkx as nx
 import sympy as sym
 from scipy.integrate import solve_ivp
 
-from equation import Vertex, generate_equations
+from equation.Term import Vertex
 from equation.generation import format_term
-
-from model_params.cmodel import get_SIR
 
 
 def initial_conditions(nodes, functions, choice=None, num_initial_infected=1, symbol=0, yes=1, no=0):
@@ -94,14 +91,14 @@ def solve(full_equations, g, init_cond=None, t_max=10, step=1e-2, rtol=1e-4, ato
     return y_out
 
 
-def scipy_solve():
-    print('setting up')
-    st = time()
-    g = nx.random_tree(4)
-    full_equations = generate_equations(g, get_SIR(), closures=False)
-    print(f'{len(full_equations)} equations generated in {time() - st}s')
-    solve(full_equations, g)
-    print('solved')
+# def scipy_solve():
+#     print('setting up')
+#     st = time()
+#     g = nx.random_tree(4)
+#     full_equations = generate_equations(g, get_SIR(), closures=False)
+#     print(f'{len(full_equations)} equations generated in {time() - st}s')
+#     solve(full_equations, g)
+#     print('solved')
 
 
 def scipy_integration_summary(info):

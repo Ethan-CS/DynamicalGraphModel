@@ -1,14 +1,3 @@
-import sys
-
-from equation_MC_comparison import run_measure
-
-SYS_STDOUT = sys.stdout
-
-
-def main():
-    run_measure()
-
-
 # def runtime_large_model():
 #     print('starting')
 #     i = 3
@@ -32,7 +21,3 @@ def main():
 #             print(f'\\dot{{{sym.Integral(e.lhs).doit().func}}} &= {e.rhs} \\\\'
 #                   .replace('\u3008', '\\langle ').replace('\u3009', '\\rangle').replace('(t)', '').replace('*', ''))
 #     print(f'generated {len(set().union(*equations.values()))} equations.')  # 5i-3 for closed path
-
-
-if __name__ == '__main__':
-    main()
