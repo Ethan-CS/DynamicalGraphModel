@@ -4,9 +4,10 @@ import signal
 from datetime import datetime
 
 import networkx as nx
+import numpy as np
 import sympy as sym
 
-from equation import generate_equations
+from equation.generation import generate_equations
 from equation.solving import solve_equations, initial_conditions
 from model_params.cmodel import CModel
 from monte_carlo import run_to_average
@@ -118,3 +119,19 @@ def measure_runtimes(graph_type, num_vertices, iterations, p, t_max, method, tim
                 measure_generation_runtimes(g, iterations, sir_model, timeout, f, True, True, t_max)
             elif method == 'mc' or method == 'mcmc' or method == 'monte carlo':
                 measure_mcmc_runtimes(g, p, iterations, sir_model, timeout, f, t_max)
+
+
+def run_measure():
+    timeout = 60
+    v = 10
+    iterations = 5
+    t_max = 5
+    for p in np.linspace(0.01, 0.2, 20):
+        p = round(p, 2)
+        print(f'\n *** p={p} ***')
+        print(f'\n - Monte Carlo -')
+        measure_runtimes('random', v, iterations, p, t_max, 'mc', timeout)
+        print(f'\n - Equations -')
+        measure_runtimes('random', v, iterations, p, t_max, 'equations', timeout)
+
+run_measure()
