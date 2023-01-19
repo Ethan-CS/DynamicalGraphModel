@@ -130,7 +130,7 @@ def run_measure():
     print(f'\n - Monte Carlo -')
     with open(f'data/{graph_type}_{method.replace(" ", "_")}_data.csv', 'w+') as file:
         sys.stdout = file
-        print(f'number of vertices,{"p," if p != 0 else ""}time to solve')
+        print(f'number of vertices,p,time to solve')
         for p in np.linspace(0.01, 0.2, 20):
             p = round(p, 2)
             sys.stdout = SYS_STDOUT
@@ -141,7 +141,7 @@ def run_measure():
     print(f'\n - Equations -')
     with open(f'data/{graph_type}_{method.replace(" ", "_")}_data.csv', 'w+') as file:
         sys.stdout = file
-        print(f'number of vertices,{"p," if p != 0 else ""}time to solve')
+        print(f'number of vertices,p,time to solve')
         for p in np.linspace(0.01, 0.2, 20):
             sys.stdout = SYS_STDOUT
             print(f'\n *** p={p} ***')
