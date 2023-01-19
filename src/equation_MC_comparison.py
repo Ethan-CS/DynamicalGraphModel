@@ -121,9 +121,9 @@ def measure_runtimes(graph_type, num_vertices, iterations, p, t_max, method, tim
 
 def run_measure():
     graph_type = 'random'
-    timeout = 5
-    v = 5
-    iterations = 1
+    timeout = 60
+    v = 25
+    iterations = 5
     t_max = 5
 
     method = 'mc'
