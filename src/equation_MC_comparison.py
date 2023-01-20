@@ -114,38 +114,37 @@ def measure_runtimes(graph_type, num_vertices, iterations, p, t_max, method, tim
 
         # Create (and solve) the model
         if method == 'eq' or method == 'equations':
-            measure_generation_runtimes(g, iterations, sir_model, timeout, f, True, True, t_max)
+            measure_generation_runtimes(g, iterations, sir_model, timeout, f, True, False, t_max)
         elif method == 'mc' or method == 'mcmc' or method == 'monte carlo':
             measure_mcmc_runtimes(g, p, iterations, sir_model, timeout, f, t_max)
 
 
 def run_measure():
-    graph_type = 'random'
-    timeout = 60
+    graph_type = 'path'
+    timeout = 90
     v = 25
     iterations = 5
     t_max = 5
-
-    method = 'mc'
-    print(f'\n - Monte Carlo -')
-    with open(f'data/{graph_type}_{method.replace(" ", "_")}_data.csv', 'w+') as file:
-        sys.stdout = file
-        print(f'number of vertices,p,time to solve')
-        for p in np.linspace(0.01, 0.2, 20):
-            p = round(p, 2)
-            sys.stdout = SYS_STDOUT
-            print(f'\n *** p={p} ***')
-            measure_runtimes(graph_type, v, iterations, p, t_max, 'mc', timeout, file)
+    # method = 'mc'
+    # print(f'\n - Monte Carlo -')
+    # with open(f'data/{graph_type}_{method.replace(" ", "_")}_data.csv', 'w+') as file:
+    #     sys.stdout = file
+    #     print(f'number of vertices,p,time to solve')
+    #     for p in np.linspace(0.01, 0.2, 20):
+    #         p = round(p, 2)
+    #         sys.stdout = SYS_STDOUT
+    #         print(f'\n *** p={p} ***')
+    #         measure_runtimes(graph_type, v, iterations, p, t_max, 'mc', timeout, file)
 
     method = 'equations'
     print(f'\n - Equations -')
     with open(f'data/{graph_type}_{method.replace(" ", "_")}_data.csv', 'w+') as file:
         sys.stdout = file
         print(f'number of vertices,p,time to solve')
-        for p in np.linspace(0.01, 0.2, 20):
-            sys.stdout = SYS_STDOUT
-            print(f'\n *** p={p} ***')
-            measure_runtimes(graph_type, v, iterations, p, t_max, 'equations', timeout, file)
+        # for p in np.linspace(0.01, 0.2, 20):
+        sys.stdout = SYS_STDOUT
+        # print(f'\n *** p={p} ***')
+        measure_runtimes(graph_type, v, iterations, 0, t_max, 'equations', timeout, file)
 
 
 run_measure()
