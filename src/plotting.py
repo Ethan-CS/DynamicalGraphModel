@@ -46,8 +46,8 @@ def plot_style(max_val, title, x_label, y_label):
 def main():
     # plot_averages(pd.read_csv(f'data/path_data.csv'), pd.read_csv(f'data/cycle_data.csv'),
     #               pd.read_csv(f'data/tree_data.csv'))
-    plot_full_vs_closures(['random'])
-    plot_eq_vs_mc(['random'])
+    plot_full_vs_closures(['path'])
+    # plot_eq_vs_mc(['random'])
 
 
 def plot_averages(cycle_data, path_data, tree_data):
@@ -93,7 +93,9 @@ def plot_averages(cycle_data, path_data, tree_data):
 def plot_full_vs_closures(graphs: list):
     for g in graphs:
         # Read in from the CSV (just for testing, will come straight from dataframe in future)
-        data = pd.read_csv(f'data/{g}_data.csv')
+        print(f'READING: data/{g}_equations_data.csv')
+        data = pd.read_csv(f'data/{g}_equations_data.csv')
+        print(data)
         time_winners = []
         for index, row in data.iterrows():
             if row['time (full)'] <= row['time (closed)']:
@@ -107,7 +109,7 @@ def plot_full_vs_closures(graphs: list):
                 f'up to {data.iloc[-1]["num of vertices"]} vertices.'
 
         # Send to scatter plot function to compare performance
-        scatter_compare_two_methods(data, 'time (eq)', 'time (mc)', title, 'Time for equations', 'Time for Monte Carlo',
+        scatter_compare_two_methods(data, 'time (full)', 'time (closed)', title, 'Time for equations', 'Time for Monte Carlo',
                                     time_winners, max_val=30).savefig(f'data/plots/{g}_time.png')
 
 

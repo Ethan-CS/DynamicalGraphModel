@@ -121,7 +121,7 @@ def measure_runtimes(graph_type, num_vertices, iterations, p, t_max, method, tim
 
 def run_measure():
     graph_type = 'path'
-    timeout = 90
+    timeout = 120
     v = 25
     iterations = 5
     t_max = 5

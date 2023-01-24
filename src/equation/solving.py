@@ -47,7 +47,7 @@ def solve_equations(full_equations, init_conditions, graph, t_max):
 
     functions = [sym.Function(str(type(f)))(sym.symbols('t')) for f in list(LHS)]
 
-    return solve(full_equations, graph, init_cond=init_conditions, t_max=t_max, step=5e-1, rtol=1e-3, atol=1e-4,
+    return solve(full_equations, graph, init_cond=init_conditions, t_max=t_max, step=5e-1, rtol=1e-1, atol=1e-2,
                  print_option='none')
 
 
