@@ -121,8 +121,8 @@ def measure_runtimes(graph_type, num_vertices, iterations, p, t_max, method, tim
 
 def run_measure():
     graph_type = 'path'
-    timeout = 90
-    v = 25
+    timeout = 150
+    v = 15
     iterations = 5
     t_max = 5
     # method = 'mc'
@@ -140,7 +140,7 @@ def run_measure():
     print(f'\n - Equations -')
     with open(f'data/{graph_type}_{method.replace(" ", "_")}_data.csv', 'w+') as file:
         sys.stdout = file
-        print(f'number of vertices,p,time to solve')
+        print(f'num of vertices,num equations (full),time (full), num equations (closed), time to solve (closed)')
         # for p in np.linspace(0.01, 0.2, 20):
         sys.stdout = SYS_STDOUT
         # print(f'\n *** p={p} ***')
