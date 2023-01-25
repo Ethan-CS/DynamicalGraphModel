@@ -109,8 +109,8 @@ def plot_full_vs_closures(graphs: list):
                 f'up to {data.iloc[-1]["num of vertices"]} vertices.'
 
         # Send to scatter plot function to compare performance
-        scatter_compare_two_methods(data, 'time (full)', 'time (closed)', title, 'Time for equations', 'Time for Monte Carlo',
-                                    time_winners, max_val=20).savefig(f'data/plots/{g}_time.png')
+        scatter_compare_two_methods(data, 'time (full)', 'time (closed)', title, 'Time - full system',
+                                    'Time - closed system',time_winners, max_val=20).savefig(f'data/plots/{g}_time.png')
 
 
 def plot_eq_vs_mc(graphs: list):
