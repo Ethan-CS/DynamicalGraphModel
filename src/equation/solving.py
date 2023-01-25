@@ -85,7 +85,7 @@ def solve(full_equations, g, init_cond=None, t_max=10, step=1e-2, rtol=1e-4, ato
         y0.append(init_cond[each.subs(sym.symbols('t'), 0)])
 
     st = time()
-    y_out = solve_ivp(rhs, (0, t_max), y0, method="RK45", max_step=step, rtol=rtol, atol=atol)
+    y_out = solve_ivp(rhs, (0, t_max), y0, method="LSODA", max_step=step, rtol=rtol, atol=atol)
     if print_option == 'full':
         print(f'solved in {time() - st}s')
     return y_out

@@ -38,7 +38,7 @@ def plot_style(max_val, title, x_label, y_label):
     plt.title(title)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
-    plt.xlim([0, max_val])  # Axes should be same length for easier visual comparison
+    # plt.xlim([0, max_val])  # Axes should be same length for easier visual comparison
     # plt.ylim([0, max_val])
     plt.legend(title='Fastest Time', loc='lower right')
 
@@ -110,7 +110,7 @@ def plot_full_vs_closures(graphs: list):
 
         # Send to scatter plot function to compare performance
         scatter_compare_two_methods(data, 'time (full)', 'time (closed)', title, 'Time for equations', 'Time for Monte Carlo',
-                                    time_winners, max_val=30).savefig(f'data/plots/{g}_time.png')
+                                    time_winners, max_val=20).savefig(f'data/plots/{g}_time.png')
 
 
 def plot_eq_vs_mc(graphs: list):
