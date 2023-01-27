@@ -99,49 +99,52 @@ def measure_runtimes(graph_type, num_vertices, iterations, p, t_max, method, tim
     sir_model = CModel.make_SIR(0.5, 0.1)
     sys.stdout = f  # Change the standard output to the file we created.
 
-    for i in range(2, num_vertices+1):
-        sys.stdout = SYS_STDOUT
-        print(f'\nnumber of vertices: {i}')
+    sys.stdout = SYS_STDOUT
+    print(f'\nnumber of vertices: {num_vertices}')
 
-        # Get the specified graph
-        g = None
-        if graph_type == 'path':
-            g = nx.path_graph(i)
-        elif graph_type == 'cycle':
-            g = nx.cycle_graph(i)
-        elif graph_type == 'random':
-            g = nx.erdos_renyi_graph(i, p)
+    # Get the specified graph
+    g = None
+    if graph_type == 'path':
+        g = nx.path_graph(num_vertices)
+    elif graph_type == 'cycle':
+        g = nx.cycle_graph(num_vertices)
+    elif graph_type == 'random':
+        g = nx.erdos_renyi_graph(num_vertices, p)
 
-        # Create (and solve) the model
-        if method == 'eq' or method == 'equations':
-            measure_generation_runtimes(g, iterations, sir_model, timeout, f, True, True, t_max)
-        elif method == 'mc' or method == 'mcmc' or method == 'monte carlo':
-            measure_mcmc_runtimes(g, p, iterations, sir_model, timeout, f, t_max)
+    # Create (and solve) the model
+    if method == 'eq' or method == 'equations':
+        measure_generation_runtimes(g, iterations, sir_model, timeout, f, True, True, t_max)
+    elif method == 'mc' or method == 'mcmc' or method == 'monte carlo':
+        measure_mcmc_runtimes(g, p, iterations, sir_model, timeout, f, t_max)
 
 
 def run_measure():
     graph_type = 'random'
     timeout = 150
-    v = 15
-    iterations = 5
+    v = 25
+    iterations = 25
     t_max = 5
 
-    method = 'equations'
-    print(f'\n - Equations -')
-    with open(f'data/{graph_type}_{method.replace(" ", "_")}_data.csv', 'w+') as file:
-        sys.stdout = file
-        print(f'num of vertices,p,num equations,time to solve')
-        for p in np.linspace(0.01, 0.2, 20):
-            sys.stdout = SYS_STDOUT
-            print(f'\n *** p={p} ***')
-            measure_runtimes(graph_type, v, iterations, p, t_max, 'equations', timeout, file)
+    range_of_probs = np.linspace(0.02, 0.2, 10)
 
     method = 'mc'
     print(f'\n - Monte Carlo -')
-    with open(f'data/{graph_type}_{method.replace(" ", "_")}_data.csv', 'w+') as file:
+    with open(f'data/{graph_type}_{method.replace(" ", "_")}_same_v_data.csv', 'w+') as file:
+        # for i in range(2, num_vertices + 1):
         sys.stdout = file
         print(f'num of vertices,p,time to solve')
-        for p in np.linspace(0.01, 0.2, 20):
+        for p in range_of_probs:
+            sys.stdout = SYS_STDOUT
+            print(f'\n *** p={p} ***')
+            measure_runtimes(graph_type, v, iterations, p, t_max, method, timeout, file)
+
+    method = 'equations'
+    print(f'\n - Equations -')
+    with open(f'data/{graph_type}_{method.replace(" ", "_")}_same_v_data.csv', 'w+') as file:
+        # for i in range(2, num_vertices + 1):
+        sys.stdout = file
+        print(f'num of vertices,p,num equations,time to solve')
+        for p in range_of_probs:
             sys.stdout = SYS_STDOUT
             print(f'\n *** p={p} ***')
             measure_runtimes(graph_type, v, iterations, p, t_max, method, timeout, file)

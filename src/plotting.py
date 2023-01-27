@@ -16,10 +16,17 @@ matplotlib.use('TkAgg')
 
 
 # Used to produce a scatter plot comparing the time performance of two methods that achieve the same result
-def scatter_compare_two_methods(data, x_filter, y_filter, title='', x_label='', y_label='', hue=None, max_val=0):
+def scatter_compare_two_methods(data, x_filter, y_filter, title='', x_label='', y_label='', hue=None, max_val=0,
+                                timeout=None):
+
     g = sns.scatterplot(data=data, x=data[x_filter], y=data[y_filter], hue=data['winner'] if hue is None else hue)
+
+    if timeout is not None:
+        plt.axvline(x=timeout, color='r', linestyle='dashed', label='Timeout')
+
     if max_val == 0:
         max_val_for_axes(data, x_filter, y_filter)
+
     plot_style(max_val, title, x_label, y_label)
 
     return g.get_figure()
@@ -46,8 +53,8 @@ def plot_style(max_val, title, x_label, y_label):
 def main():
     # plot_averages(pd.read_csv(f'data/path_data.csv'), pd.read_csv(f'data/cycle_data.csv'),
     #               pd.read_csv(f'data/tree_data.csv'))
-    plot_full_vs_closures(['path'])
-    # plot_eq_vs_mc(['random'])
+    # plot_full_vs_closures(['path'], timeout=150)
+    plot_eq_vs_mc(['random'])
 
 
 def plot_averages(cycle_data, path_data, tree_data):
@@ -90,7 +97,7 @@ def plot_averages(cycle_data, path_data, tree_data):
     print(averages)
 
 
-def plot_full_vs_closures(graphs: list):
+def plot_full_vs_closures(graphs: list, timeout=None):
     for g in graphs:
         # Read in from the CSV (just for testing, will come straight from dataframe in future)
         print(f'READING: data/{g}_equations_data.csv')
@@ -109,8 +116,9 @@ def plot_full_vs_closures(graphs: list):
                 f'up to {data.iloc[-1]["num of vertices"]} vertices.'
 
         # Send to scatter plot function to compare performance
-        scatter_compare_two_methods(data, 'time (full)', 'time (closed)', title, 'Time - full system',
-                                    'Time - closed system',time_winners, max_val=20).savefig(f'data/plots/{g}_time.png')
+        scatter_compare_two_methods(data, 'time (full)', 'time (closed)', title, 'Time - full system (s)',
+                                    'Time - closed system (s)', time_winners, max_val=20, timeout=timeout)\
+            .savefig(f'data/plots/{g}_time.png')
 
 
 def plot_eq_vs_mc(graphs: list):
@@ -129,9 +137,9 @@ def plot_eq_vs_mc(graphs: list):
         for index, row_eq in data_eq.iterrows():
             row_mc = data_mc.iloc[index]
             if row_eq['time to solve'] <= row_mc['time to solve']:
-                time_winners.append('eq')
+                time_winners.append('Equations')
             else:
-                time_winners.append('mc')
+                time_winners.append('Monte Carlo')
         data['winner'] = time_winners
 
         # Define title and labels for axes
