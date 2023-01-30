@@ -16,7 +16,7 @@ matplotlib.use('TkAgg')
 
 
 # Used to produce a scatter plot comparing the time performance of two methods that achieve the same result
-def scatter_compare_two_methods(data, x_filter, y_filter, title='', x_label='', y_label='', hue=None, max_val=0,
+def scatter_compare_two_methods(data, x_filter, y_filter, title='', x_label='', y_label='', hue=None, max_val=60,
                                 timeout=None):
 
     g = sns.scatterplot(data=data, x=data[x_filter], y=data[y_filter], hue=data['winner'] if hue is None else hue)
@@ -45,9 +45,9 @@ def plot_style(max_val, title, x_label, y_label):
     plt.title(title)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
-    # plt.xlim([0, max_val])  # Axes should be same length for easier visual comparison
+    plt.xlim([0, max_val])  # Axes should be same length for easier visual comparison
     # plt.ylim([0, max_val])
-    plt.legend(title='Fastest Time', loc='lower right')
+    plt.legend(title='Legend', frameon=False,)
 
 
 def main():
@@ -124,14 +124,15 @@ def plot_full_vs_closures(graphs: list, timeout=None):
 def plot_eq_vs_mc(graphs: list):
     for g in graphs:
         # Read in from the CSV (just for testing, will come straight from dataframe in future)
-        data_mc = pd.read_csv(f'data/{g}_mc_data.csv')
-        data_eq = pd.read_csv(f'data/{g}_equations_data.csv')
+        data_mc = pd.read_csv(f'data/{g}_mc_same_v_data.csv')
+        data_eq = pd.read_csv(f'data/{g}_equations_same_v_data.csv')
 
         num_eq, num_mc = len(data_eq.index), len(data_mc.index)
         smallest = min(num_eq, num_mc)
 
         data = pd.concat([data_eq.rename(columns={'time to solve': 'time (eq)'})['time (eq)'].iloc[:smallest],
-                         data_mc.rename(columns={'time to solve': 'time (mc)'})['time (mc)'].iloc[:smallest]], axis=1)
+                         data_mc.rename(columns={'time to solve': 'time (mc)'})['time (mc)'].iloc[:smallest],
+                         data_mc['p'].iloc[:smallest]], axis=1)
 
         time_winners = []
         for index, row_eq in data_eq.iterrows():
@@ -144,11 +145,11 @@ def plot_eq_vs_mc(graphs: list):
 
         # Define title and labels for axes
         title = f'Time to generate and solve equations for $SIR$ models\n on random graphs '\
-                f'up to {int(data_mc.iloc[-1]["number of vertices"])} vertices.'
+                f'on {int(data_mc.iloc[-1]["number of vertices"])} vertices.'
 
         # Send to scatter plot function to compare performance
         scatter_compare_two_methods(data, 'time (eq)', 'time (mc)', title, 'Time for equations', 'Time for Monte Carlo',
-                                    time_winners, max_val=30).savefig(f'data/plots/{g}_time.png')
+                                    data['p'], max_val=30).savefig(f'data/plots/{g}_time.png')
 
 
 if __name__ == "__main__":

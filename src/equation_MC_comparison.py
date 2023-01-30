@@ -55,13 +55,19 @@ def measure_generation_runtimes(g, num_iter, model, timeout, f, solve, closures_
         signal.alarm(0)  # cancel timer if process completed before timeout
         closed_time_taken = datetime.now() - closed_start
 
-        sys.stdout = f  # Change the standard output to the file
-        if not closures_only:
-            print(f'{len(g.nodes())},{len(list(set().union(*full_equations.values())))},{full_time_taken.seconds}.{full_time_taken.microseconds},'
-                  f'{len(list(set().union(*closed_equations.values())))},{closed_time_taken.seconds}.{closed_time_taken.microseconds}')
-        else:
-            print(f'{len(g.nodes())},{len(list(set().union(*closed_equations.values())))},{closed_time_taken.seconds}.'
-                  f'{closed_time_taken.microseconds}')
+        if type(closed_equations) is list:
+            print(f'closed equations is a list:\n{closed_equations}')
+        if type(full_equations) is list:
+            print(f'full equations is a list:\n{full_equations}')
+
+        if (type(closed_equations) is not list) and (type(full_equations) is not list):
+            sys.stdout = f  # Change the standard output to the file
+            if not closures_only:
+                print(f'{len(g.nodes())},{len(list(set().union(*full_equations.values())))},{full_time_taken.seconds}.{full_time_taken.microseconds},'
+                      f'{len(list(set().union(*closed_equations.values())))},{closed_time_taken.seconds}.{closed_time_taken.microseconds}')
+            else:
+                print(f'{len(g.nodes())},{len(list(set().union(*closed_equations.values())))},{closed_time_taken.seconds}.'
+                      f'{closed_time_taken.microseconds}')
         sys.stdout = SYS_STDOUT  # Reset the standard output to its original value
 
 
@@ -120,23 +126,23 @@ def measure_runtimes(graph_type, num_vertices, iterations, p, t_max, method, tim
 
 def run_measure():
     graph_type = 'random'
-    timeout = 150
-    v = 25
-    iterations = 25
+    timeout = 60
+    v = 20
+    iterations = 5
     t_max = 5
 
-    range_of_probs = np.linspace(0.02, 0.2, 10)
-
-    method = 'mc'
-    print(f'\n - Monte Carlo -')
-    with open(f'data/{graph_type}_{method.replace(" ", "_")}_same_v_data.csv', 'w+') as file:
-        # for i in range(2, num_vertices + 1):
-        sys.stdout = file
-        print(f'num of vertices,p,time to solve')
-        for p in range_of_probs:
-            sys.stdout = SYS_STDOUT
-            print(f'\n *** p={p} ***')
-            measure_runtimes(graph_type, v, iterations, p, t_max, method, timeout, file)
+    # range_of_probs = np.linspace(0.02, 0.2, 10)
+    range_of_probs = [0.5]
+    # method = 'mc'
+    # print(f'\n - Monte Carlo -')
+    # with open(f'data/{graph_type}_{method.replace(" ", "_")}_same_v_data.csv', 'w+') as file:
+    #     # for i in range(2, num_vertices + 1):
+    #     sys.stdout = file
+    #     print(f'num of vertices,p,time to solve')
+    #     for p in range_of_probs:
+    #         sys.stdout = SYS_STDOUT
+    #         print(f'\n *** p={p} ***')
+    #         measure_runtimes(graph_type, v, iterations, p, t_max, method, timeout, file)
 
     method = 'equations'
     print(f'\n - Equations -')
