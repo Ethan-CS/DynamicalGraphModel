@@ -32,8 +32,10 @@ def main():
             csv_data += f'{p},{2*graph.number_of_edges() / float(graph.number_of_nodes())},' \
                         f'{get_and_solve_equations(graph, timeout, False, time_to_solve_to)},' \
                         f'{get_and_solve_equations(graph, timeout, True, time_to_solve_to)}\n'
-    print('probability,avg degree,size no closures,size closures')
-    print(csv_data)
+
+    with open('data/erdos-renyi-equations.csv', 'w') as writer:
+        writer.write('probability,avg degree,size no closures,size closures')
+        writer.write(csv_data)
 
 
 def get_and_solve_equations(graph, timeout, closures, t_max):
