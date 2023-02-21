@@ -6,8 +6,8 @@ import networkx as nx
 import sympy as sym
 from networkx import Graph
 
-from Term import Vertex, Term
-from closing import can_be_closed, replace_with_closures
+from equation.Term import Vertex, Term
+from equation.closing import can_be_closed, replace_with_closures
 from model_params.cmodel import CModel
 from model_params.helpers import dynamically_relevant, Coupling, coupling_types
 
