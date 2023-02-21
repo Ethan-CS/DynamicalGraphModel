@@ -18,11 +18,14 @@ matplotlib.use('TkAgg')
 # Used to produce a scatter plot comparing the time performance of two methods that achieve the same result
 def scatter_compare_two_methods(data, x_filter, y_filter, title='', x_label='', y_label='', hue=None, max_val=60,
                                 timeout=None):
-
-    g = sns.scatterplot(data=data, x=data[x_filter], y=data[y_filter], hue=data['winner'] if hue is None else hue)
-
+    # df1['A'] = df1['A'].apply(lambda x: [y if y <= 9 else 11 for y in x])
     if timeout is not None:
         plt.axvline(x=timeout, color='r', linestyle='dashed', label='Timeout')
+        data[x_filter] = data[x_filter].apply(lambda x: x if x <= timeout else timeout)
+        data[y_filter] = data[y_filter].apply(lambda x: x if x <= timeout else timeout)
+
+    g = sns.scatterplot(data=data, x=data[x_filter], y=data[y_filter],
+                        hue=data['winner'] if hue is None else hue)
 
     if max_val == 0:
         max_val_for_axes(data, x_filter, y_filter)
@@ -45,9 +48,9 @@ def plot_style(max_val, title, x_label, y_label):
     plt.title(title)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
-    plt.xlim([0, max_val])  # Axes should be same length for easier visual comparison
+    # plt.xlim([0, max_val])  # Axes should be same length for easier visual comparison
     # plt.ylim([0, max_val])
-    plt.legend(title='Legend', frameon=False,)
+    # plt.legend()
 
 
 def main():
@@ -145,11 +148,11 @@ def plot_eq_vs_mc(graphs: list):
 
         # Define title and labels for axes
         title = f'Time to generate and solve equations for $SIR$ models\n on random graphs '\
-                f'on {int(data_mc.iloc[-1]["number of vertices"])} vertices.'
-
+                f'on {int(data_mc.iloc[-1]["num of vertices"])} vertices.'
+        data = data.rename({'p': 'Probability'}, axis=1)
         # Send to scatter plot function to compare performance
         scatter_compare_two_methods(data, 'time (eq)', 'time (mc)', title, 'Time for equations', 'Time for Monte Carlo',
-                                    data['p'], max_val=30).savefig(f'data/plots/{g}_time.png')
+                                    data['Probability'], timeout=60).savefig(f'data/plots/{g}_time.png')
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ class Term:
         string = ""
         for v in self._vertices:
             if type(v) == Vertex:
-                string += f"{v.state}{v.node} "
+                string += f"{v.state}_{v.node} "
             else:
                 string += f"{v} "
         string = "\u3008" + string[:-1] + "\u3009"
@@ -108,7 +108,7 @@ class Vertex:
         self.node = int(node)
 
     def __str__(self):
-        return f"\u3008{self.state}{self.node}\u3009"
+        return f"\u3008{self.state}_{self.node}\u3009"
 
     def __lt__(self, other):
         if type(other) == Vertex:

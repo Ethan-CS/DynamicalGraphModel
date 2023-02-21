@@ -132,27 +132,28 @@ def run_measure():
     t_max = 5
 
     range_of_probs = np.linspace(0.02, 0.2, 10)
-    # method = 'mc'
-    # print(f'\n - Monte Carlo -')
-    # with open(f'data/{graph_type}_{method.replace(" ", "_")}_same_v_data.csv', 'w+') as file:
-    #     # for i in range(2, num_vertices + 1):
-    #     sys.stdout = file
-    #     print(f'num of vertices,p,time to solve')
-    #     for p in range_of_probs:
-    #         sys.stdout = SYS_STDOUT
-    #         print(f'\n *** p={p} ***')
-    #         measure_runtimes(graph_type, v, iterations, p, t_max, method, timeout, file)
 
-    method = 'equations'
-    print(f'\n - Equations -')
+    method = 'mc'
+    print(f'\n - Monte Carlo -')
     with open(f'data/{graph_type}_{method.replace(" ", "_")}_same_v_data.csv', 'w+') as file:
         # for i in range(2, num_vertices + 1):
         sys.stdout = file
-        print(f'num of vertices,p,num equations,time to solve')
+        print(f'num of vertices,p,time to solve')
         for p in range_of_probs:
             sys.stdout = SYS_STDOUT
             print(f'\n *** p={p} ***')
             measure_runtimes(graph_type, v, iterations, p, t_max, method, timeout, file)
+
+    # method = 'equations'
+    # print(f'\n - Equations -')
+    # with open(f'data/{graph_type}_{method.replace(" ", "_")}_same_v_data.csv', 'w+') as file:
+    #     # for i in range(2, num_vertices + 1):
+    #     sys.stdout = file
+    #     print(f'num of vertices,p,num equations,time to solve')
+    #     for p in range_of_probs:
+    #         sys.stdout = SYS_STDOUT
+    #         print(f'\n *** p={p} ***')
+    #         measure_runtimes(graph_type, v, iterations, p, t_max, method, timeout, file)
 
 
 run_measure()
