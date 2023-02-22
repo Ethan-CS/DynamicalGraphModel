@@ -1,3 +1,4 @@
+import os
 import signal
 from time import time
 
@@ -16,11 +17,11 @@ def main():
         raise Exception("Solving timeout")
     csv_data = ""
     signal.signal(signal.SIGALRM, handler)
-    num_v = 10
+    num_v = 50
     num_iter = 5
     time_to_solve_to = 5
     timeout = 60
-    for p in [round(p, 2) for p in np.linspace(0.02, 0.5, 25)]:
+    for p in [round(p, 2) for p in np.linspace(0.02, 0.2, 20)]:
         print(f' --- p={p} ---')
         for i in range(0, num_iter):
             print(f'iter {i+1} of {num_iter}')
@@ -33,7 +34,10 @@ def main():
                         f'{get_and_solve_equations(graph, timeout, False, time_to_solve_to)},' \
                         f'{get_and_solve_equations(graph, timeout, True, time_to_solve_to)}\n'
 
-    with open('data/erdos-renyi-equations.csv', 'w') as writer:
+    if not os.path.exists('data'):
+        # Create a new directory if it does not exist
+        os.makedirs('data')
+    with open('data/erdos-renyi-equations.csv', 'w+') as writer:
         writer.write('probability,avg degree,size no closures,size closures')
         writer.write(csv_data)
 
