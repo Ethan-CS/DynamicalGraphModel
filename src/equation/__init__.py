@@ -17,7 +17,7 @@ def main():
         raise Exception("Solving timeout")
     csv_data = ""
     signal.signal(signal.SIGALRM, handler)
-    num_v = 50
+    num_v = 20
     num_iter = 5
     time_to_solve_to = 5
     timeout = 60
