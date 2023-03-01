@@ -234,8 +234,9 @@ def derive(v: Vertex, term_without_v: Term, g: Graph, model: CModel, closures=Fa
             else:
                 # Need to only consider the term, not any coefficients or dependencies
                 term_as_string = str(each_term)
+                coefficient = ""
                 if '*' in term_as_string:
-                    term_as_string = term_as_string.split('*', 1)[1]
+                    coefficient, term_as_string = term_as_string.split('*', 1)[0], term_as_string.split('*', 1)[1]
                 cleaned = re.sub("[-_.+*\u3008\u3009(t)]", "", term_as_string)
                 vertices = [Vertex(v[0], int(v[1:])) for v in cleaned.split()]
                 actual_term = Term(vertices)
@@ -247,7 +248,7 @@ def derive(v: Vertex, term_without_v: Term, g: Graph, model: CModel, closures=Fa
                     sub_terms = 1
                     for each_closure_term in closure_terms:
                         sub_terms *= each_closure_term
-                    all_expressions += sub_terms
+                    all_expressions += sym.symbols(coefficient) * sub_terms if coefficient != "" else sub_terms
                     all_terms.append(sub_terms)
     return all_expressions, all_terms
 

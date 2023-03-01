@@ -21,6 +21,7 @@ def scatter_compare_two_methods(data, x_filter, y_filter, title='', x_label='', 
     # df1['A'] = df1['A'].apply(lambda x: [y if y <= 9 else 11 for y in x])
     if timeout is not None:
         plt.axvline(x=timeout, color='r', linestyle='dashed', label='Timeout')
+        # plt.axhline(y=timeout, color='r', linestyle='dashed')
         data[x_filter] = data[x_filter].apply(lambda x: x if x <= timeout else timeout)
         data[y_filter] = data[y_filter].apply(lambda x: x if x <= timeout else timeout)
 
@@ -56,8 +57,8 @@ def plot_style(max_val, title, x_label, y_label):
 def main():
     # plot_averages(pd.read_csv(f'data/path_data.csv'), pd.read_csv(f'data/cycle_data.csv'),
     #               pd.read_csv(f'data/tree_data.csv'))
-    # plot_full_vs_closures(['path'], timeout=150)
-    plot_eq_vs_mc(['random'])
+    plot_er_full_closures(timeout=60)
+    # plot_eq_vs_mc(['random'])
 
 
 def plot_averages(cycle_data, path_data, tree_data):
@@ -100,6 +101,36 @@ def plot_averages(cycle_data, path_data, tree_data):
     print(averages)
 
 
+def plot_er_full_closures(timeout=None):
+    # Read in from the CSV (just for testing, will come straight from dataframe in future)
+    print(f'READING: data/erdos_renyi_equations_data.csv')
+    data = pd.read_csv(f'data/erdos_renyi_equations_data.csv')
+    print(data)
+    time_winners = []
+    for index, row in data.iterrows():
+        if row['time (full)'] <= row['time (closed)']:
+            time_winners.append('full')
+        else:
+            time_winners.append('closed')
+    data['winner'] = time_winners
+
+    # Define title and labels for axes
+    title = f'Time to generate and solve equations for $SIR$ models\n on Erdős–Rényi ' \
+            f'on 25 vertices up to $p=0.2$.'
+
+    # Send to scatter plot function to compare performance
+    if timeout is not None:
+        # plt.axvline(x=timeout, color='r', linestyle='dashed', label='Timeout')
+        plt.axhline(y=timeout, color='r', linestyle='dashed', label='Timeout')
+        data['time (full)'] = data['time (full)'].apply(lambda x: x if x <= timeout else timeout)
+        data['time (closed)'] = data['time (closed)'].apply(lambda x: x if x <= timeout else timeout)
+
+    g = sns.scatterplot(x=data['probability'], y=data['time (full)'], hue=data['average degree'])
+    plot_style(0, title, 'Probability', 'Time to generate and solve full system')
+
+    g.get_figure().savefig(f'data/plots/{g}_full_time.png')
+
+
 def plot_full_vs_closures(graphs: list, timeout=None):
     for g in graphs:
         # Read in from the CSV (just for testing, will come straight from dataframe in future)
@@ -122,6 +153,7 @@ def plot_full_vs_closures(graphs: list, timeout=None):
         scatter_compare_two_methods(data, 'time (full)', 'time (closed)', title, 'Time - full system (s)',
                                     'Time - closed system (s)', time_winners, max_val=20, timeout=timeout)\
             .savefig(f'data/plots/{g}_time.png')
+
 
 
 def plot_eq_vs_mc(graphs: list):

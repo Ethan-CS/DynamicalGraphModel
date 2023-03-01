@@ -1,4 +1,3 @@
-import os
 import signal
 from time import time
 
@@ -12,34 +11,33 @@ from model_params.cmodel import CModel, get_SIR
 
 
 def main():
-    def handler(signum, frame):  # Timeout handler
-        print('solving TO')
-        raise Exception("Solving timeout")
-    csv_data = ""
-    signal.signal(signal.SIGALRM, handler)
-    num_v = 20
-    num_iter = 5
-    time_to_solve_to = 5
-    timeout = 60
-    for p in [round(p, 2) for p in np.linspace(0.02, 0.2, 20)]:
-        print(f' --- p={p} ---')
-        for i in range(0, num_iter):
-            print(f'iter {i+1} of {num_iter}')
-            graph = nx.erdos_renyi_graph(n=num_v, p=p)
+    print(count_equations(generate_equations(nx.path_graph(3), get_SEIQRDV_model(), closures=True), True))
 
-            # print(f'graph: {nx.info(graph)} edges')
-            # Register the signal function handler
-
-            csv_data += f'{p},{2*graph.number_of_edges() / float(graph.number_of_nodes())},' \
-                        f'{get_and_solve_equations(graph, timeout, False, time_to_solve_to)},' \
-                        f'{get_and_solve_equations(graph, timeout, True, time_to_solve_to)}\n'
-
-    if not os.path.exists('data'):
-        # Create a new directory if it does not exist
-        os.makedirs('data')
-    with open('data/erdos-renyi-equations.csv', 'w+') as writer:
-        writer.write('probability,avg degree,size no closures,size closures')
-        writer.write(csv_data)
+    # def handler(signum, frame):  # Timeout handler
+    #     print('solving TO')
+    #     raise Exception("Solving timeout")
+    # csv_data = ""
+    # signal.signal(signal.SIGALRM, handler)
+    # num_v = 10
+    # num_iter = 5
+    # time_to_solve_to = 5
+    # timeout = 60
+    # for p in [round(p, 2) for p in np.linspace(0.02, 0.5, 25)]:
+    #     print(f' --- p={p} ---')
+    #     for i in range(0, num_iter):
+    #         print(f'iter {i+1} of {num_iter}')
+    #         graph = nx.erdos_renyi_graph(n=num_v, p=p)
+    #
+    #         # print(f'graph: {nx.info(graph)} edges')
+    #         # Register the signal function handler
+    #
+    #         csv_data += f'{p},{2*graph.number_of_edges() / float(graph.number_of_nodes())},' \
+    #                     f'{get_and_solve_equations(graph, timeout, False, time_to_solve_to)},' \
+    #                     f'{get_and_solve_equations(graph, timeout, True, time_to_solve_to)}\n'
+    #
+    # with open('data/erdos-renyi-equations.csv', 'w') as writer:
+    #     writer.write('probability,avg degree,size no closures,size closures')
+    #     writer.write(csv_data)
 
 
 def get_and_solve_equations(graph, timeout, closures, t_max):
@@ -66,6 +64,7 @@ def get_SEIQRDV_model():
     model = CModel('SEIQRDV')
     model.set_coupling_rate('S:S=>V', name='\\alpha')  # vaccination
     model.set_coupling_rate('S*I:S=>E', name='\\beta_1')  # exposure 1
+    model.set_coupling_rate('S*E:S=>E', name='\\beta_2')  # exposure 2
     model.set_coupling_rate('V:V=>S', name='\\zeta')  # loss of vaccine immunity
     model.set_coupling_rate('E:E=>I', name='\\gamma')  # symptom development
     model.set_coupling_rate('I:I=>Q', name='\\delta')  # quarantine
@@ -75,13 +74,14 @@ def get_SEIQRDV_model():
     return model
 
 
-def count_equations(equations):
+def count_equations(equations, p=False):
     count = 0
     for num in equations:
         for e in equations[num]:
             count += 1
-            # print(f'\dot{{{sym.Integral(e.lhs).doit()}}} &= {e.rhs}\\\\'.replace('〈', '\langle ')
-            #       .replace('〉', '\\rangle ').replace('*', ''))
+            if p:
+                print(f'\dot{{{sym.Integral(e.lhs).doit()}}} &= {e.rhs}\\\\'
+                      .replace('〈', '\langle ').replace('〉', '\\rangle ').replace('*', ''))
     return count
 
 
