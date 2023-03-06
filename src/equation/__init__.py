@@ -22,7 +22,7 @@ def main():
             print(f'should be {3*i**2-3*i} equations')
             time_to_solve = get_and_solve_equations(cycle, 60, False, 5)
             print(f'time: {time_to_solve}')
-            times += f'{i},{time()}\n'
+            times += f'{i},{time_to_solve}\n'
     print(times)
     with open(filePath, 'w+') as f:
         f.write(times)

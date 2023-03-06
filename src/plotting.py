@@ -56,11 +56,18 @@ def plot_style(max_val, title, x_label, y_label):
 
 
 def main():
-    # plot_averages(pd.read_csv(f'data/path_data.csv'), pd.read_csv(f'data/cycle_data.csv'),
-    #               pd.read_csv(f'data/tree_data.csv'))
-    # plot_er_full_closures(timeout=60)
-    # plot_eq_vs_mc(['random'])
-    plot_full_vs_closures(['path'], 150)
+    data = pd.read_csv('/Users/ethanhunter/PycharmProjects/DynamicalGraphModel/src/data/cycle_data.csv')
+    print(data)
+    time_0 = data.iloc[0]['time']
+    print(f'time 0: {time_0}')
+
+    # Define title and labels for axes
+    title = f'Time to generate and solve equations for $SIR$ models\n on cycles ' \
+            f'up to {data.iloc[-1]["n"]} vertices.'
+
+    g = sns.scatterplot(x=data['n'], y=data['time'])
+    plot_style(0, title, 'Number of vertices', 'Time to generate and solve full system')
+    g.get_figure().savefig(f'data/plots/cycle_time.png')
 
 
 def plot_averages(cycle_data, path_data, tree_data):
