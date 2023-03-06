@@ -45,13 +45,13 @@ def solve_equations(full_equations, init_conditions, graph, t_max):
         for each_eqn in list_of_eqn:
             LHS.append(sym.Integral(each_eqn.lhs).doit())
 
-    functions = [sym.Function(str(type(f)))(sym.symbols('t')) for f in list(LHS)]
+    # functions = [sym.Function(str(type(f)))(sym.symbols('t')) for f in list(LHS)]
 
     return solve(full_equations, graph, init_cond=init_conditions, t_max=t_max, step=5e-1, rtol=1e-1, atol=1e-2,
                  print_option='none')
 
 
-def solve(full_equations, g, init_cond=None, t_max=10, step=1e-2, rtol=1e-4, atol=1e-6, print_option='none'):
+def solve(full_equations, g, init_cond=None, t_max=10, step=1e-2, rtol=1e-2, atol=1e-4, print_option='none'):
     LHS, RHS = [], []
     for list_of_eqn in full_equations.values():
         for each_eqn in list_of_eqn:

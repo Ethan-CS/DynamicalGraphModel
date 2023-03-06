@@ -49,6 +49,7 @@ def plot_style(max_val, title, x_label, y_label):
     plt.title(title)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
+    plt.legend().set_visible(False)
     # plt.xlim([0, max_val])  # Axes should be same length for easier visual comparison
     # plt.ylim([0, max_val])
     # plt.legend()
@@ -57,8 +58,9 @@ def plot_style(max_val, title, x_label, y_label):
 def main():
     # plot_averages(pd.read_csv(f'data/path_data.csv'), pd.read_csv(f'data/cycle_data.csv'),
     #               pd.read_csv(f'data/tree_data.csv'))
-    plot_er_full_closures(timeout=60)
+    # plot_er_full_closures(timeout=60)
     # plot_eq_vs_mc(['random'])
+    plot_full_vs_closures(['path'], 150)
 
 
 def plot_averages(cycle_data, path_data, tree_data):
