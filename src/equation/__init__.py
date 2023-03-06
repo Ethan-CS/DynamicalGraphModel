@@ -1,4 +1,5 @@
 import signal
+from pathlib import Path
 from time import time
 
 import networkx as nx
@@ -11,33 +12,20 @@ from model_params.cmodel import CModel, get_SIR
 
 
 def main():
-    print(count_equations(generate_equations(nx.path_graph(3), get_SEIQRDV_model(), closures=True), True))
-
-    # def handler(signum, frame):  # Timeout handler
-    #     print('solving TO')
-    #     raise Exception("Solving timeout")
-    # csv_data = ""
-    # signal.signal(signal.SIGALRM, handler)
-    # num_v = 10
-    # num_iter = 5
-    # time_to_solve_to = 5
-    # timeout = 60
-    # for p in [round(p, 2) for p in np.linspace(0.02, 0.5, 25)]:
-    #     print(f' --- p={p} ---')
-    #     for i in range(0, num_iter):
-    #         print(f'iter {i+1} of {num_iter}')
-    #         graph = nx.erdos_renyi_graph(n=num_v, p=p)
-    #
-    #         # print(f'graph: {nx.info(graph)} edges')
-    #         # Register the signal function handler
-    #
-    #         csv_data += f'{p},{2*graph.number_of_edges() / float(graph.number_of_nodes())},' \
-    #                     f'{get_and_solve_equations(graph, timeout, False, time_to_solve_to)},' \
-    #                     f'{get_and_solve_equations(graph, timeout, True, time_to_solve_to)}\n'
-    #
-    # with open('data/erdos-renyi-equations.csv', 'w') as writer:
-    #     writer.write('probability,avg degree,size no closures,size closures')
-    #     writer.write(csv_data)
+    times = 'n,time\n'
+    filePath = Path("data/cycle_data.csv")
+    filePath.touch(exist_ok=True)
+    for i in range(3, 4):
+        print(f' --- i={i} ---')
+        for _ in range(2):
+            cycle = nx.cycle_graph(i)
+            print(f'should be {3*i**2-3*i} equations')
+            time_to_solve = get_and_solve_equations(cycle, 60, False, 5)
+            print(f'time: {time_to_solve}')
+            times += f'{i},{time()}\n'
+    print(times)
+    with open(filePath, 'w+') as f:
+        f.write(times)
 
 
 def get_and_solve_equations(graph, timeout, closures, t_max):
@@ -53,7 +41,6 @@ def get_and_solve_equations(graph, timeout, closures, t_max):
         init_conditions = initial_conditions(list(graph.nodes), functions=func)
         solve_equations(equations, init_conditions, graph, t_max)
         end = time() - start
-        print(f'SIR {"with" if closures else "without"} closures: number={count_equations(equations)}, time={end}')
         signal.alarm(0)
         return end
     except Exception as exc:
