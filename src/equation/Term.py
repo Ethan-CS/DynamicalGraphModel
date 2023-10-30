@@ -13,6 +13,9 @@ def is_valid(candidate: str):
 
 
 class Term:
+    """
+    Defines a term in an equation, using SymPy for later algebraic manipulation.
+    """
     def __init__(self, _vertices):
         assert _vertices != [], 'Vertex list is empty'
         if type(_vertices) == Term:

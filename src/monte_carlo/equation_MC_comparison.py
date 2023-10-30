@@ -16,6 +16,9 @@ from monte_carlo.mc_sim import set_initial_state
 SYS_STDOUT = sys.stdout
 
 
+# this code was used in the associated publication (see readme) to compare the dynamical (equations) approach to a
+# more common Monte Carlo approach and has been left so results can be verified and similar results obtained if desired
+
 def handler(signum, frame):
     raise Exception("TIMEOUT")
 

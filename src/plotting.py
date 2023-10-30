@@ -4,6 +4,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from matplotlib import pyplot as plt
+
+# This file was used to produce the plots in the associated publication (see readme) and has been left so that
+# similar plots can be reproduced when using this project, if desired.
 
 # Set seaborn as default and set resolution and style defaults
 sns.set()
@@ -49,25 +53,29 @@ def plot_style(max_val, title, x_label, y_label):
     plt.title(title)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
-    plt.legend().set_visible(False)
+    plt.legend().set_visible(True)
+
     # plt.xlim([0, max_val])  # Axes should be same length for easier visual comparison
     # plt.ylim([0, max_val])
     # plt.legend()
 
 
 def main():
-    data = pd.read_csv('/Users/ethanhunter/PycharmProjects/DynamicalGraphModel/src/data/cycle_data.csv')
+    data = pd.read_csv('/Users/ethanhunter/PycharmProjects/DynamicalGraphModel/src/data/path_equations_data.csv')
     print(data)
-    time_0 = data.iloc[0]['time']
-    print(f'time 0: {time_0}')
+
+    plt.axhline(y=150, color='r', linestyle='dashed', label='Timeout')
+    data[f'time (full)'] = data[f'time (full)'].apply(lambda x: x if x <= 150 else 150)
+    data[f'time (closed)'] = data[f'time (closed)'].apply(lambda x: x if x <= 150 else 150)
 
     # Define title and labels for axes
-    title = f'Time to generate and solve equations for $SIR$ models\n on cycles ' \
-            f'up to {data.iloc[-1]["n"]} vertices.'
-
-    g = sns.scatterplot(x=data['n'], y=data['time'])
-    plot_style(0, title, 'Number of vertices', 'Time to generate and solve full system')
+    title = f'Time to generate and solve equations for $SIR$ models\n on paths ' \
+            f'up to 25 vertices.'
+    g = sns.scatterplot(x=data['num of vertices'], y=data[f'time (full)'], label='Full', alpha=0.4, s=70)
+    sns.scatterplot(x=data['num of vertices'], y=data[f'time (closed)'], label='Closed', alpha=0.4, s=70)
+    plot_style(0, title, 'Number of vertices', f'Time to generate and solve equations')
     g.get_figure().savefig(f'data/plots/cycle_time.png')
+    # plot_er_full_closures(60)
 
 
 def plot_averages(cycle_data, path_data, tree_data):
@@ -124,7 +132,7 @@ def plot_er_full_closures(timeout=None):
     data['winner'] = time_winners
 
     # Define title and labels for axes
-    title = f'Time to generate and solve equations for $SIR$ models\n on Erdős–Rényi ' \
+    title = f'Time to generate and solve equations for $SIR$ models\n on Erdős–Rényi graphs ' \
             f'on 25 vertices up to $p=0.2$.'
 
     # Send to scatter plot function to compare performance
@@ -134,7 +142,7 @@ def plot_er_full_closures(timeout=None):
         data['time (full)'] = data['time (full)'].apply(lambda x: x if x <= timeout else timeout)
         data['time (closed)'] = data['time (closed)'].apply(lambda x: x if x <= timeout else timeout)
 
-    g = sns.scatterplot(x=data['probability'], y=data['time (full)'], hue=data['average degree'])
+    g = sns.scatterplot(x=data['probability'], y=data['time (closed)'], hue=data['average degree'])
     plot_style(0, title, 'Probability', 'Time to generate and solve full system')
 
     g.get_figure().savefig(f'data/plots/{g}_full_time.png')
@@ -198,3 +206,15 @@ def plot_eq_vs_mc(graphs: list):
 
 if __name__ == "__main__":
     main()
+
+
+def plot_mc_averages(mc_averages, soln):
+    mc_averages.columns = [f'$I_{i}$' for i in range(len(mc_averages.columns))]
+    mc_averages.plot()
+    count = 0
+    for i in soln:
+        plt.axhline(y=i, linestyle='--', label=f'True $I_{count}$')
+        count += 1
+    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+    plt.tight_layout()
+    plt.show()

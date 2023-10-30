@@ -9,12 +9,22 @@ from matplotlib import pyplot as plt
 from equation.generation import generate_equations
 from equation.solving import initial_conditions, Vertex, solve
 from model_params.cmodel import CModel, get_SIR
+from plotting import plot_mc_averages
 
 
 # matplotlib.use('module://backend_interagg')
 
 
 def monte_carlo_sim(graph: nx.Graph, model: CModel, init_state: dict, t_max: int):
+    """
+    Given a graph-based compartmental model, run a MCMC simulation using specified initial conditions to a given
+    timestep.
+    :param graph: underlying graph for the model.
+    :param model: compartmental modelling framework.
+    :param init_state: initial conditions (which vertices are initially infected, which are susceptible for SIR).
+    :param t_max: maximum timestep to which we should run the simulation.
+    :return:
+    """
     beta = model.couplings['beta'][1]  # Rate of infection
     gamma = model.couplings['gamma'][1]  # Rate of recovery
 
@@ -39,6 +49,7 @@ def monte_carlo_sim(graph: nx.Graph, model: CModel, init_state: dict, t_max: int
 
 
 def example_monte_carlo(to_avg=False):
+    # An example usage of the Monte Carlo simulation function
     tree = nx.path_graph(10)
     model = get_SIR(0.8, 0.1)
     t_max = 5
@@ -146,18 +157,6 @@ def try_run_to_avg():
     mc_avg = solve_with_mc(model, None, graph, initial_for_mc, t_max=t_max, tol=tol, timeout=timeout, num_rounds=num_rounds)
     plot_mc_averages(mc_avg, soln)
     print(mc_avg.values[-1].tolist())
-
-
-def plot_mc_averages(mc_averages, soln):
-    mc_averages.columns = [f'$I_{i}$' for i in range(len(mc_averages.columns))]
-    mc_averages.plot()
-    count = 0
-    for i in soln:
-        plt.axhline(y=i, linestyle='--', label=f'True $I_{count}$')
-        count += 1
-    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
-    plt.tight_layout()
-    plt.show()
 
 
 def solve_with_mc(model, target_average, graph, init_for_MC, num_rounds, t_max, timeout, tol):

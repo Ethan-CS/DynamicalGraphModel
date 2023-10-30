@@ -31,8 +31,9 @@ def find_cut_vertices(graph: Graph):
     return cuts
 
 
-# True if the specified term can be closed (i.e. contains a cut-vertex), false otherwise
 def can_be_closed(term: Term, g: Graph):
+    # Returns true if the specified term can be closed (i.e. contains a cut-vertex), false otherwise
+
     if len(term.vertices) < 3:
         return False
     else:
@@ -42,6 +43,8 @@ def can_be_closed(term: Term, g: Graph):
 
 
 def replace_with_closures(term: Term, graph: Graph):
+    # Given a term (and the underlying grap), applies closure result and returns the terms to use instead of original.
+
     if type(term) == sym.Symbol or sym.Function:
         term = Term(str(term))
 

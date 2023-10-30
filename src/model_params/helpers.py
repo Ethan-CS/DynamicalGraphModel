@@ -34,7 +34,6 @@ def coupling_types(model):
                     else:
                         _coupling_map[state].append((Coupling.ISOLATED_ENTER, model.couplings[couple][0],
                                                     model.couplings[couple][1], couple))
-# TODO does this look at how you can end up (transition[x][-1]) in this state too?
     return _coupling_map
 
 

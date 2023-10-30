@@ -9,6 +9,18 @@ from equation.generation import format_term
 
 
 def initial_conditions(nodes, functions, choice=None, num_initial_infected=1, symbol=0, yes=1, no=0):
+    """
+    Defines initial conditions as specified by the solver used (LSODA).
+
+    :param nodes: list of vertices in the graph
+    :param functions: list of LHS of equations in the system
+    :param choice: specified choice of initial conditions, which are randomised if unspecified.
+    :param num_initial_infected: number of initial infected vertices, defaults to one.
+    :param symbol: symbol used to denote time (such as `t`) for printing, does not print if left as 0.
+    :param yes: probability with which a vertex is initially infected (1=certain yes, 0=certain no).
+    :param no: probability with which a vertex is initially susceptible.
+    :return: set of initial conditions used for solving system of equations.
+    """
     initial_values = {}
     for node in list(nodes):
         initial_values[sym.Function(str(Vertex('S', node)))(symbol)] = yes
@@ -40,18 +52,26 @@ def initial_conditions(nodes, functions, choice=None, num_initial_infected=1, sy
 
 
 def solve_equations(full_equations, init_conditions, graph, t_max):
+    """
+    Solves the system of equations for the initial conditions given.
+
+    :param full_equations: system of equations.
+    :param init_conditions: initial conditions for which to solve the equations.
+    :param graph: underlying graph in the model.
+    :param t_max: maximum timestep for which the solver should solve.
+    :return: the solution of the system of equations for these initial conditions.
+    """
     LHS = []
     for list_of_eqn in full_equations.values():
         for each_eqn in list_of_eqn:
             LHS.append(sym.Integral(each_eqn.lhs).doit())
-
-    # functions = [sym.Function(str(type(f)))(sym.symbols('t')) for f in list(LHS)]
 
     return solve(full_equations, graph, init_cond=init_conditions, t_max=t_max, step=5e-1, rtol=1e-1, atol=1e-2,
                  print_option='none')
 
 
 def solve(full_equations, g, init_cond=None, t_max=10, step=1e-2, rtol=1e-2, atol=1e-4, print_option='none'):
+    # Solves a system of equations given parameters (equations, tolerances, max timestep, initial conditions)
     LHS, RHS = [], []
     for list_of_eqn in full_equations.values():
         for each_eqn in list_of_eqn:
@@ -90,49 +110,3 @@ def solve(full_equations, g, init_cond=None, t_max=10, step=1e-2, rtol=1e-2, ato
         print(f'solved in {time() - st}s')
     return y_out
 
-
-# def scipy_solve():
-#     print('setting up')
-#     st = time()
-#     g = nx.random_tree(4)
-#     full_equations = generate_equations(g, get_SIR(), closures=False)
-#     print(f'{len(full_equations)} equations generated in {time() - st}s')
-#     solve(full_equations, g)
-#     print('solved')
-
-
-def scipy_integration_summary(info):
-    s = ''
-    s += '='*32 + '\n'
-    for i in info.keys():
-        msg = i
-        if i == 'hu':
-            msg = 'vector of step sizes successfully used for each time step'
-        elif i == 'tcur':
-            msg = 'vector with value of t reached for each time step'
-        elif i == 'tolsf':
-            msg = 'vector of tolerance scale factors (>1.0) ' \
-                  'computed when a request for too much accuracy was detected'
-        elif i == 'tsw':
-            msg = 'value of t at time of the last method switch for each timestep'
-        elif i == 'nst':
-            msg = 'cumulative number of time steps'
-        elif i == 'nfe':
-            msg = 'cumulative number of function evaluations for each time step'
-        elif i == 'nje':
-            msg = 'cumulative number of jacobian evaluations for each time step'
-        elif i == 'nqu':
-            msg = 'a vector of method orders for each successful step'
-        elif i == 'imxer':
-            msg = 'index of the component of largest magnitude in the ' \
-                  'weighted local error vector (e / ewt) on an error return, -1 ' \
-                  'otherwise'
-        elif i == 'lenrw':
-            msg = 'the length of the double work array required'
-        elif i == 'leniw':
-            msg = 'the length of integer work array required'
-        elif i == 'mused':
-            msg = 'a vector of method indicators for each successful time step: ' \
-                  '1: adams (nonstiff), 2: bdf (stiff)'
-        s += f'{msg}:\n{info[i]}'
-    s += '\n=' * 32
