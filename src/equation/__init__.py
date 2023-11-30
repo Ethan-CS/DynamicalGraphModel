@@ -1,9 +1,6 @@
-import signal
-from pathlib import Path
 from time import time
 
 import networkx as nx
-import numpy as np
 import sympy as sym
 
 from equation.generation import generate_equations
@@ -54,19 +51,19 @@ def get_and_solve_equations(graph, closures, t_max, model=get_SIR()):
     return end
 
 
-def count_equations(equations, p=False):
+def count_equations(equations, verbose=False):
     """
     Counts the number of equations in a system.
 
     :param equations: the system of equations to count.
-    :param p: true if equations should be printed as counted, false otherwise (defaults to false).
+    :param verbose: true if equations should be printed as counted, false otherwise (defaults to false).
     :return: the number of equations in the system.
     """
     count = 0
     for num in equations:
         for e in equations[num]:
             count += 1
-            if p:
+            if verbose:
                 print(f'\dot{{{sym.Integral(e.lhs).doit()}}} &= {e.rhs}\\\\'
                       .replace('〈', '\langle ').replace('〉', '\\rangle ').replace('*', ''))
     return count
