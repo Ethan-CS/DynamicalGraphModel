@@ -13,15 +13,21 @@ from model_params.cmodel import CModel, get_SIR
 
 def main():
     """
-    Example usage of generating equations method on path graphs from 2 to 10 vertices, which are then printed to console
+    Example usage of generating full_equations method on path graphs from 2 to 10 vertices, which are then printed to console
     """
-    for i in range(2, 11):
-        print(f'-----{i}-----')
-        equations = generate_equations(nx.path_graph(i), get_SIR(beta=0, gamma=0), closures=True)
-        for length in equations:
-            for eq in equations[length]:
-                print(f'\dot{{{sym.integrate(eq.lhs)}}} &= {eq.rhs}'.replace('(t)', '').replace('〈', '\\langle ')
-                      .replace('〉', '\\rangle ').replace('\\beta', '\\beta_{}').replace('\\gamma', '\\gamma_{}'))
+    model = CModel('SEIRV')
+    model.set_coupling_rate('S*I:S=>E', 1, name='\\beta_1')  # Infection rate
+    model.set_coupling_rate('S*E:S=>E', 1, name='\\beta_2')  # Infection rate
+    model.set_coupling_rate('I:I=>R', 3, name='\\gamma')  # Recovery rate
+    model.set_coupling_rate('S:S=>V', 5, name='\\tau')  # Vaccination rate
+    model.set_coupling_rate('V:V=>E', 4, name='\\delta')  # Vaccination rate
+
+    print(model.couplings)
+
+    graph = nx.Graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4)])
+
+    print(f'without closures={count_equations(generate_equations(graph, model, closures=False), False)}')
+    print(f'   with closures={count_equations(generate_equations(graph, model, closures=True), False)}')
 
 
 def get_and_solve_equations(graph, closures, t_max, model=get_SIR()):

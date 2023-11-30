@@ -147,6 +147,8 @@ def run_measure():
             print(f'\n *** p={p} ***')
             measure_runtimes(graph_type, v, iterations, p, t_max, method, timeout, file)
 
+    # Below is commented out but was used in producing data for associated publication, so remains for transparency
+    # Below is commented out but was used in producing data for associated publication, so remains for transparency
     # method = 'equations'
     # print(f'\n - Equations -')
     # with open(f'data/{graph_type}_{method.replace(" ", "_")}_same_v_data.csv', 'w+') as file:

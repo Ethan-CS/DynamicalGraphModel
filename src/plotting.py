@@ -6,8 +6,8 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-# This file was used to produce the plots in the associated publication (see readme) and has been left so that
-# similar plots can be reproduced when using this project, if desired.
+# This file was used to produce the plots in the associated publication (see readme) and has been left for transparency
+# and so that similar plots can be reproduced when using this project, if desired.
 
 # Set seaborn as default and set resolution and style defaults
 sns.set()

@@ -38,7 +38,6 @@ def can_be_closed(term: Term, g: Graph):
         return False
     else:
         subgraph = nx.subgraph(g, term.node_list())
-        # TODO check the cut-vertex in this term is in the list of cut-vertices of the graph
         return len(list(nx.articulation_points(subgraph))) > 0 and len(list(nx.articulation_points(g))) > 0
 
 
