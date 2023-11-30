@@ -27,11 +27,12 @@ tags:
 
 # Summary
 
-We provide a codebase that implements an approach to modelling disease that has been studied by several authors
-(first rigorously defined in [@sharkey:2011], significantly improved in [@kiss:2017]) in answer to an open problem left
-in [@kiss:2017], among other locations.
+We provide a codebase that implements an approach to modelling disease that has been studied by several authors. This 
+approach was described in [@sharkey:2011] and significantly improved in [@kiss:2017] with the introduction of
+a result reducing the number of equations required to give an exact and deterministic representation of the full system
+dynamics. The provision of our codebase answers an open problem in [@kiss:2017].
 
-This code heavily extends the procedure described (but not defined algorithmically) in the literature by opening the
+This code heavily extends the procedure described in the literature by opening the
 approach up to any (statically defined) compartmental, whereas the
 approach has been used only with $SIR$ (susceptible-infected-recovered) models so far. Any graph can be defined as the
 contact network using the Networkx package [@networkx]. The code generates equations exactly describing
