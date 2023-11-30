@@ -45,6 +45,7 @@ scenarios. In particular, in [@hunter:2023] we compare the performance of this c
 key functionality of this codebase (i.e., generating and solving equations from specified compartmental models and 
 contact graphs for particular initial conditions) is provided in the `testing` directory.
 
+
 # Statement of need
 
 Our code answers an open question from [@sharkey:2011, @kiss:2017] by giving procedures to generate and solve equations
