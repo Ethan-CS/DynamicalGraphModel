@@ -32,8 +32,8 @@ a result reducing the number of equations required for an exact representation o
 provision of our codebase answers an open problem in [@kiss:2017].
 
 This code heavily extends the procedure described in the literature by opening the
-approach up to any (statically defined) compartmental, whereas the
-approach has been used only with $SIR$ (susceptible-infected-recovered) models so far. Any graph can be defined as the
+approach up to any (statically defined) compartmental model, whereas its use in literature has so far been restricted to 
+$SIR$ (susceptible-infected-recovered) models. Any graph can be defined as the
 contact network using the Networkx package [@networkx]. The code generates equations exactly describing
 deterministically the dynamics of a compartmental model on a network. These equations can then be solved for given sets
 of initial conditions (which nodes are initially infected) and the codebase contains code that plots these results.
