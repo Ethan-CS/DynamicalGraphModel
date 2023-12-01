@@ -76,3 +76,5 @@ An example is given in the `__init__.py` file in the `equation` package. Broadly
       See [kiss:2017, hunter:2023] for explanations of this closure result and the algorithmic procedure respectively.
 - In `__init__`, we provide a method that counts the number of equations in a system (and prints out if `verbose` is
   set to `True`)
+
+# References
