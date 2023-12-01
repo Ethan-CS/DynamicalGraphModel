@@ -1,36 +1,35 @@
 ---
 title: 'Implementation of an exact, deterministic dynamical approach to compartmental models of disease'
 tags:
-
 - Python
 - ODE
 - compartmental model
 - master equation
 - moment closure
-  authors:
+authors:
 - name: Ethan Hunter
+  email: e.hunter.2@research.gla.ac.uk
   orcid: 0000-0002-4309-6861
   affiliation: 1
 - name: Jessica Enright
-  orcid:
+  orcid: 0000-0002-0266-3292
   affiliation: 1
 - name: Alice Miller
-  orcid:
+  orcid: 0000-0002-0941-1717
   affiliation: 1
-  affiliations:
+affiliations:
 - name: University of Glasgow, Glasgow, G12 8QQ, United Kingdom
   index: 1
   date: 30 November 2023
   bibliography: paper.bib
-
 ---
 
 # Summary
 
-We provide a codebase that implements an approach to modelling disease that has been studied by several authors. This 
-approach was described in [@sharkey:2011] and significantly improved in [@kiss:2017] with the introduction of
-a result reducing the number of equations required to give an exact and deterministic representation of the full system
-dynamics. The provision of our codebase answers an open problem in [@kiss:2017].
+We provide an implementation of an approach to modelling disease that has been studied by several authors. This
+approach was described in [@sharkey:2011] and significantly improved in [@kiss:2017] by the introduction of
+a result reducing the number of equations required for an exact representation of the full system dynamics. The
+provision of our codebase answers an open problem in [@kiss:2017].
 
 This code heavily extends the procedure described in the literature by opening the
 approach up to any (statically defined) compartmental, whereas the
@@ -42,23 +41,23 @@ of initial conditions (which nodes are initially infected) and the codebase cont
 This code was used to produce experimental results for an associated publication [@hunter:2023], which outlines broadly
 the algorithmic procedure used and discusses the feasibility of this approach for modelling diseases in real-world
 scenarios. In particular, in [@hunter:2023] we compare the performance of this code to simulation. Code for testing the
-key functionality of this codebase (i.e., generating and solving equations from specified compartmental models and 
+key functionality of this codebase (i.e., generating and solving equations from specified compartmental models and
 contact graphs for particular initial conditions) is provided in the `testing` directory.
-
 
 # Statement of need
 
-Our code answers an open question from [@sharkey:2011, @kiss:2017] by giving procedures to generate and solve equations
-for compartmental models with underlying contact networks. Others, such as outlined in [@sharkey:2011], have written
-their own code to
-generate equations for systems up to a certain length of terms. Instead, our code generates and solves equations up to
-the full size, which is required for full, complete and deterministic representations of compartmental model dynamics.
+Our code answers an open question from [@kiss:2017] by giving procedures to generate and solve equations
+for compartmental models with underlying contact networks. Others, such as in [@sharkey:2011], have written
+their own code to generate equations for systems up to a certain length of terms (usually terms on one and two 
+vertices), which approximates the system dynamics. Instead, our code generates and solves equations up to
+the full system size, yielding full, complete and deterministic representations of  model dynamics.
 
-The more usual approach to obtaining modelling results for compartmental models on contact networks is to use a simulation 
-approach, which we have included an example of in the `monte_carlo` directory. Using this dynamical approach means that 
-we can obtain exact, deterministic modelling results (whereas simulation relies on stochasticity, so cannot guarantee 
-convergence to the correct answer). While in [@hunter:2023] we show that simulation is always faster than generating and 
-solving equations (and explain the computational theory to address why this is the case), this implementation is 
+The more usual approach to obtaining modelling results for compartmental models on contact networks is to use a
+simulation
+approach, which we have included an example of in the `monte_carlo` directory. Using this dynamical approach means that
+we can obtain exact, deterministic modelling results (whereas simulation relies on stochasticity, so cannot guarantee
+convergence to the correct answer). While in [@hunter:2023] we show that simulation is always faster than generating and
+solving equations (and explain the computational theory to address why this is the case), this implementation is
 intended for use in situations where epidemiologists require certainty in the correctness of the outputted answer.
 
 # Usage
