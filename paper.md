@@ -21,7 +21,7 @@ affiliations:
 - name: University of Glasgow, Glasgow, G12 8QQ, United Kingdom
   index: 1
   date: 30 November 2023
-  bibliography: paper.bib
+bibliography: paper.bib
 ---
 
 # Summary
