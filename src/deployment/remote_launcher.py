@@ -32,6 +32,13 @@ class RemoteExperimentOrchestrator:
     def __init__(self, cluster: RemoteClusterConfig, dry_run: bool = False) -> None:
         self.cluster = cluster
         self.dry_run = dry_run
+        self._common_ssh_options = [
+            "-o", "BatchMode=yes",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "ConnectTimeout=15",
+            "-o", "ServerAliveInterval=60",
+            "-o", "ServerAliveCountMax=3",
+        ]
 
     @property
     def _proxy_jump(self) -> Optional[str]:
@@ -40,7 +47,7 @@ class RemoteExperimentOrchestrator:
         return f"{self.cluster.username}@{self.cluster.gateway}"
 
     def _ssh_base(self) -> List[str]:
-        return ["ssh"]
+        return ["ssh", *self._common_ssh_options]
 
     def _ssh_with_jumps(self, host: str, via_head: bool = False) -> List[str]:
         cmd = self._ssh_base()
@@ -62,7 +69,7 @@ class RemoteExperimentOrchestrator:
             return
         dest = f"{self.cluster.username}@{self.cluster.head_node}:{self.cluster.remote_base_dir}/"
         excludes = [item for pattern in self.cluster.rsync_excludes for item in ("--exclude", pattern)]
-        ssh_cmd_parts = ["ssh"]
+        ssh_cmd_parts = self._ssh_base()
         proxy = self._proxy_jump
         if proxy:
             ssh_cmd_parts.extend(["-J", proxy])
@@ -77,13 +84,11 @@ class RemoteExperimentOrchestrator:
             dest_path.write_text(local_config.read_text())
             print(f"[remote] Upload experiment config:\n           copied locally to {dest_path}")
             return
-        cmd = [
-            "scp",
-            "-o",
-            f"ProxyJump={self._proxy_jump}",
-            str(local_config),
-            f"{self.cluster.username}@{self.cluster.head_node}:{remote_config}",
-        ]
+        cmd = ["scp", *self._common_ssh_options]
+        proxy = self._proxy_jump
+        if proxy:
+            cmd.extend(["-o", f"ProxyJump={proxy}"])
+        cmd.extend([str(local_config), f"{self.cluster.username}@{self.cluster.head_node}:{remote_config}"])
         self._run(cmd, description="Upload experiment config")
 
     def ensure_remote_dirs(self, remote_paths: Iterable[str]) -> None:
