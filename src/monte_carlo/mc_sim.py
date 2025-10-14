@@ -1,4 +1,5 @@
 from time import time
+from typing import List, Optional
 
 import networkx as nx
 import numpy as np
@@ -11,8 +12,16 @@ from equation.solving import initial_conditions, Vertex, solve
 from model_params.cmodel import CModel, get_SIR
 from plotting import plot_mc_averages
 
+class MonteCarloTimeoutError(TimeoutError):
+    def __init__(self, seconds: float, averages: pd.DataFrame):
+        super().__init__(f"Monte Carlo simulation exceeded {seconds:.2f} seconds")
+        self.averages = averages
 
-# matplotlib.use('module://backend_interagg')
+
+def _build_average_frame(rows: List[List[float]], columns: List[int]) -> pd.DataFrame:
+    if not rows:
+        return pd.DataFrame(columns=columns, dtype=float)
+    return pd.DataFrame(rows, columns=columns, dtype=float)
 
 
 def monte_carlo_sim(graph: nx.Graph, model: CModel, init_state: dict, t_max: int):
@@ -51,7 +60,7 @@ def monte_carlo_sim(graph: nx.Graph, model: CModel, init_state: dict, t_max: int
 def example_monte_carlo(to_avg=False):
     # An example usage of the Monte Carlo simulation function
     tree = nx.path_graph(10)
-    model = get_SIR(0.8, 0.1)
+    model = get_SIR(0.8, 0.1)  # type: ignore[arg-type]
     t_max = 5
     print('Beginning with', tree)
     print('Model:', model.couplings)
@@ -88,50 +97,62 @@ def set_initial_state(model, tree, choice=None):
     return initial_state
 
 
-def run_to_average(graph, model, init_state, t_max, solution=None, tolerance=0.1, timeout=60, num_rounds=10):
-    solution_range = []
-    if solution is not None:
-        print('solution:', solution)
-        sol = list(solution.values()) if type(solution) == dict else list(solution)
-        solution_range = [(s - tolerance, s + tolerance) for s in sol]
+def run_to_average(
+    graph,
+    model,
+    init_state,
+    t_max,
+    solution=None,
+    tolerance: float = 0.1,
+    timeout: Optional[float] = 60,
+    num_rounds: int = 10,
+):
     head = [i for i in range(len(init_state))]
-    results = pd.DataFrame(columns=head, dtype=object)
-    averages = pd.DataFrame(columns=[i for i in range(len(init_state))], dtype=object)
-    start = time()
+    target_bounds = None
+    if solution is not None:
+        values = list(solution.values()) if isinstance(solution, dict) else list(solution)
+        target_bounds = [(float(s) - tolerance, float(s) + tolerance) for s in values]
+
+    averages_rows: List[List[float]] = []
+    cumulative = np.zeros(len(init_state), dtype=float)
     counter = 1
+    prev_mean: Optional[List[float]] = None
+    start = time()
+
     while True:
-        results = pd.concat([results, pd.DataFrame(data=[monte_carlo_sim(graph, model, init_state, t_max)])])
-        if averages.empty:
-            prev_mean = [-1 for _ in range(len(results.columns))]  # -1 as there is no prev mean on first iteration
+        trial_values = np.array(monte_carlo_sim(graph, model, init_state, t_max), dtype=float)
+        cumulative += trial_values
+        count = len(averages_rows) + 1
+        mean = (cumulative / count).tolist()
+        averages_rows.append(mean)
+
+        if target_bounds is None and prev_mean is not None:
+            bounds = [(m - tolerance, m + tolerance) for m in prev_mean]
         else:
-            prev_mean = averages.iloc[-1].tolist()  # If there is a prev mean, get last row of averages table
+            bounds = target_bounds
 
-        if solution is None:  # Means we are running to own consistent average, not to target average
-            solution_range = [(s - tolerance, s + tolerance) for s in prev_mean]
+        within = False
+        if bounds is not None:
+            within = all(lower < val < upper for val, (lower, upper) in zip(mean, bounds))
 
-        mean = [results[i].mean() for i in range(len(results.columns))]
-        averages = pd.concat([averages, pd.DataFrame(data=[mean])]).reset_index(drop=True)
-
-        within = True  # set to False if averages not inside acceptable range
-        for i in range(len(mean)):
-            if not solution_range[i][0] < mean[i] < solution_range[i][1]:
-                within = False
-                counter = 1  # Reset the counter
-                break
         if within:
             if counter == num_rounds:
-                return averages
-            else:
-                counter += 1
-        if time() - start >= timeout:
-            return averages
+                return _build_average_frame(averages_rows, head)
+            counter += 1
+        else:
+            counter = 1
+
+        prev_mean = mean
+
+        if timeout and timeout > 0 and time() - start >= timeout:
+            raise MonteCarloTimeoutError(timeout, _build_average_frame(averages_rows, head))
 
 
 def try_run_to_avg():
     t = sym.symbols('t')
     graph = nx.cycle_graph(3)
     beta, gamma = 0.5, 0.0
-    model = get_SIR(beta, gamma)
+    model = get_SIR(beta, gamma)  # type: ignore[arg-type]
     tol = 1e-1
     timeout = 30
     t_max = 5
@@ -167,11 +188,16 @@ def solve_with_mc(model, target_average, graph, init_for_MC, num_rounds, t_max, 
         print(f'\nsolving using MC to consistent internal average using:\n  '
               f'- initial conditions: {init_for_MC}')
     start = time()
-    mc_defined = run_to_average(graph, model, init_for_MC, t_max=t_max, solution=target_average,
-                                tolerance=tol, timeout=timeout,
-                                num_rounds=num_rounds)
+    try:
+        mc_defined = run_to_average(graph, model, init_for_MC, t_max=t_max, solution=target_average,
+                                    tolerance=tol, timeout=timeout,
+                                    num_rounds=num_rounds)
+        timed_out = False
+    except MonteCarloTimeoutError as exc:
+        mc_defined = exc.averages
+        timed_out = True
     sol = time() - start
-    print(f'time to solve: {sol if sol < timeout else "TO"}')
+    print(f'time to solve: {"TO" if timed_out else sol}')
     print(f'solution:\n{mc_defined.tail(1)}')
     return mc_defined
 

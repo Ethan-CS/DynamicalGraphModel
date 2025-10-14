@@ -9,9 +9,9 @@ import signal
 import threading
 import time
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, cast
 
 import networkx as nx
 import numpy as np
@@ -21,7 +21,7 @@ from equation.generation import generate_equations
 from equation.solving import initial_conditions, solve_equations
 from experiments.config import ExperimentConfig
 from model_params.cmodel import CModel
-from monte_carlo.mc_sim import run_to_average, set_initial_state
+from monte_carlo.mc_sim import MonteCarloTimeoutError, run_to_average, set_initial_state
 
 
 RESULT_FIELDS = [
@@ -62,7 +62,7 @@ CLI_DEFAULTS = {
 
 
 @contextmanager
-def time_limit(seconds: Optional[int]):
+def time_limit(seconds: Optional[float]):
     if seconds is None or seconds <= 0:
         yield
         return
@@ -80,6 +80,33 @@ def time_limit(seconds: Optional[int]):
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous)
+
+
+class TimeoutBudget:
+    def __init__(self, seconds: Optional[float]):
+        self._total = float(seconds) if seconds and seconds > 0 else None
+        self._deadline = time.monotonic() + self._total if self._total else None
+
+    def remaining(self) -> Optional[float]:
+        if self._deadline is None:
+            return None
+        return max(0.0, self._deadline - time.monotonic())
+
+    @contextmanager
+    def limit(self, label: str):
+        remaining = self.remaining()
+        if remaining is None:
+            yield
+            return
+        if remaining <= 0:
+            total_desc = f" ({self._total:.2f} seconds)" if self._total is not None else ""
+            raise TimeoutError(f"Timeout expired before {label} started{total_desc}")
+        try:
+            with time_limit(remaining):
+                yield
+        except TimeoutError as exc:
+            total_desc = f" ({self._total:.2f} seconds)" if self._total is not None else ""
+            raise TimeoutError(f"{label} exceeded allotted timeout{total_desc}") from exc
 
 
 def build_graph(config: ExperimentConfig) -> nx.Graph:
@@ -137,7 +164,7 @@ def collect_lhs_functions(equations: Dict[int, Sequence[sym.Eq]]) -> List[sym.Ex
     functions: List[sym.Expr] = []
     for eq_list in equations.values():
         for eq in eq_list:
-            functions.append(sym.Integral(eq.lhs).doit())
+            functions.append(cast(sym.Expr, sym.Integral(eq.lhs).doit()))
     return functions
 
 
@@ -156,13 +183,13 @@ def count_unique_equations(equations: Dict[int, Sequence[sym.Eq]]) -> int:
 def run_equations_trial(config: ExperimentConfig, graph: nx.Graph, model: CModel, iteration: int) -> Dict[str, object]:
     row = base_row(config, method="equations", iteration=iteration)
     start = time.monotonic()
+    budget = TimeoutBudget(config.timeout)
 
     try:
-        with time_limit(config.timeout):
+        with budget.limit("equation generation"):
             equations = generate_equations(graph, model, closures=config.use_closures)
         if not isinstance(equations, dict):
             raise RuntimeError("Equation generation returned unexpected data structure")
-        row["runtime_seconds"] = time.monotonic() - start
         row["num_equations"] = count_equations(equations)
         row["unique_equations"] = count_unique_equations(equations)
         row["max_equation_length"] = max(equations.keys()) if equations else 0
@@ -176,10 +203,11 @@ def run_equations_trial(config: ExperimentConfig, graph: nx.Graph, model: CModel
                 symbol=sym.symbols("t"),
             )
             solve_start = time.monotonic()
-            with time_limit(config.timeout):
+            with budget.limit("equation solving"):
                 solve_equations(equations, init_cond, graph, config.t_max)
             row["solve_runtime_seconds"] = time.monotonic() - solve_start
 
+        row["runtime_seconds"] = time.monotonic() - start
         row["status"] = "ok"
     except TimeoutError as exc:
         row["status"] = "timeout"
@@ -195,10 +223,12 @@ def run_equations_trial(config: ExperimentConfig, graph: nx.Graph, model: CModel
 def run_monte_carlo_trial(config: ExperimentConfig, graph: nx.Graph, model: CModel, iteration: int) -> Dict[str, object]:
     row = base_row(config, method="monte_carlo", iteration=iteration)
     start = time.monotonic()
+    budget = TimeoutBudget(config.timeout)
 
     init_state = set_initial_state(model, graph)
     try:
-        with time_limit(config.timeout):
+        mc_timeout = budget.remaining() or config.timeout
+        with budget.limit("monte carlo simulation"):
             averages = run_to_average(
                 graph,
                 model,
@@ -206,7 +236,7 @@ def run_monte_carlo_trial(config: ExperimentConfig, graph: nx.Graph, model: CMod
                 config.t_max,
                 solution=config.target_average,
                 tolerance=config.tolerance,
-                timeout=config.timeout,
+                timeout=mc_timeout,
                 num_rounds=max(5, config.iterations),
             )
         row["runtime_seconds"] = time.monotonic() - start
@@ -214,6 +244,14 @@ def run_monte_carlo_trial(config: ExperimentConfig, graph: nx.Graph, model: CMod
         if len(averages.index) > 0:
             row["mc_final_mean"] = json.dumps([float(averages[i].iloc[-1]) for i in averages.columns])
         row["status"] = "ok"
+    except MonteCarloTimeoutError as exc:
+        row["status"] = "timeout"
+        row["runtime_seconds"] = time.monotonic() - start
+        averages = exc.averages
+        row["mc_rounds"] = len(averages.index)
+        if len(averages.index) > 0:
+            row["mc_final_mean"] = json.dumps([float(averages[i].iloc[-1]) for i in averages.columns])
+        row["notes"] = str(exc)
     except TimeoutError as exc:
         row["status"] = "timeout"
         row["runtime_seconds"] = time.monotonic() - start
@@ -227,7 +265,7 @@ def run_monte_carlo_trial(config: ExperimentConfig, graph: nx.Graph, model: CMod
 
 def base_row(config: ExperimentConfig, method: str, iteration: int) -> Dict[str, object]:
     return {
-        "timestamp": datetime.utcnow().isoformat(timespec="seconds"),
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "graph_type": config.graph_type,
         "num_vertices": config.num_vertices,
         "graph_params": json.dumps(config.graph_params, sort_keys=True, default=str),
