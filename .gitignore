@@ -3,3 +3,5 @@
 /.idea/
 /src/data/
 /src/equation/data/
+*.DS_Store
+__pycache__/

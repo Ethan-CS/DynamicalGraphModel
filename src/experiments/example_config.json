@@ -1,0 +1,30 @@
+{
+  "experiments": [
+    {
+      "graph_type": "erdos_renyi",
+      "num_vertices": 100,
+      "graph_params": {"p": 0.05},
+      "method": "both",
+      "iterations": 10,
+      "timeout": 900,
+      "t_max": 20,
+      "use_closures": true,
+      "solve_equations": false,
+      "num_initial_infected": 1,
+      "tolerance": 0.01
+    },
+    {
+      "graph_type": "barabasi_albert",
+      "num_vertices": 100,
+      "graph_params": {"m": 3},
+      "method": "monte_carlo",
+      "iterations": 15,
+      "timeout": 900,
+      "t_max": 20,
+      "use_closures": true,
+      "solve_equations": false,
+      "num_initial_infected": 1,
+      "tolerance": 0.01
+    }
+  ]
+}
