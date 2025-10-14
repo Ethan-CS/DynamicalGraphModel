@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software for a publication, please cite the associated paper."
+title: "Implementation of an exact, deterministic dynamical approach to compartmental models of disease"
+version: "0.1.0"
+doi: "doi:10.1016/j.tcs.2023.114247"
+authors:
+  - family-names: "Hunter"
+    given-names: "Ethan"
+    orcid: "https://orcid.org/0000-0002-4309-6861"
+  - family-names: "Enright"
+    given-names: "Jessica"
+    orcid: "https://orcid.org/0000-0002-0266-3292"
+  - family-names: "Miller"
+    given-names: "Alice"
+    orcid: "https://orcid.org/0000-0002-0941-1717"
+date-released: "2023-11-30"
+license: "MIT"
+url: "https://github.com/ethankelly/DynamicalGraphModel"
+abstract: |
+  This repository provides code to algorithmically generate and solve deterministic dynamical equations
+  for compartmental models on contact networks. The implementation reproduces and extends results from
+  Hunter et al. (2023), enabling generation of exact equations and comparison to Monte Carlo simulation.
