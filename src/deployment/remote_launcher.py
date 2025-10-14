@@ -5,8 +5,9 @@ import json
 import shlex
 import subprocess
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Sequence
+from typing import Iterable, List, Optional, Sequence
 
 from experiments.config import ExperimentConfig
 
@@ -16,7 +17,7 @@ DEFAULT_EXCLUDES = [".git", "__pycache__", "*.pyc", "*.pyo", "*.swp", "data/expe
 
 @dataclass
 class RemoteClusterConfig:
-    gateway: str
+    gateway: Optional[str]
     username: str = "ekelly"
     head_node: str = "fatanode-head"
     storage_node: str = "fatanode-data"
@@ -33,17 +34,49 @@ class RemoteExperimentOrchestrator:
         self.dry_run = dry_run
 
     @property
-    def _proxy_jump(self) -> str:
+    def _proxy_jump(self) -> Optional[str]:
+        if not self.cluster.gateway:
+            return None
         return f"{self.cluster.username}@{self.cluster.gateway}"
 
+    def _ssh_base(self) -> List[str]:
+        return ["ssh"]
+
+    def _ssh_with_jumps(self, host: str, via_head: bool = False) -> List[str]:
+        cmd = self._ssh_base()
+        jumps: List[str] = []
+        proxy = self._proxy_jump
+        if proxy:
+            jumps.append(proxy)
+            if via_head:
+                jumps.append(f"{self.cluster.username}@{self.cluster.head_node}")
+        if jumps:
+            cmd.extend(["-J", ",".join(jumps)])
+        cmd.append(f"{self.cluster.username}@{host}")
+        return cmd
+
     def sync_project(self, local_root: Path) -> None:
+        if not self.cluster.gateway:
+            print("[remote] Sync project to head node:")
+            print("           skipping (running on head node)")
+            return
         dest = f"{self.cluster.username}@{self.cluster.head_node}:{self.cluster.remote_base_dir}/"
         excludes = [item for pattern in self.cluster.rsync_excludes for item in ("--exclude", pattern)]
-        ssh_cmd = f"ssh -J {self._proxy_jump}"
+        ssh_cmd_parts = ["ssh"]
+        proxy = self._proxy_jump
+        if proxy:
+            ssh_cmd_parts.extend(["-J", proxy])
+        ssh_cmd = " ".join(ssh_cmd_parts)
         cmd = ["rsync", "-az", "--delete", *excludes, "-e", ssh_cmd, f"{local_root}/", dest]
         self._run(cmd, description="Sync project to head node")
 
     def push_config(self, local_config: Path, remote_config: str) -> None:
+        if not self.cluster.gateway:
+            dest_path = Path(remote_config).expanduser()
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            dest_path.write_text(local_config.read_text())
+            print(f"[remote] Upload experiment config:\n           copied locally to {dest_path}")
+            return
         cmd = [
             "scp",
             "-o",
@@ -54,6 +87,11 @@ class RemoteExperimentOrchestrator:
         self._run(cmd, description="Upload experiment config")
 
     def ensure_remote_dirs(self, remote_paths: Iterable[str]) -> None:
+        if not self.cluster.gateway:
+            for path in remote_paths:
+                Path(path).expanduser().mkdir(parents=True, exist_ok=True)
+            print("[remote] Create remote directories:\n           ensured locally")
+            return
         command = " && ".join(f"mkdir -p {path}" for path in remote_paths)
         self._ssh(self.cluster.head_node, command, description="Create remote directories")
 
@@ -78,48 +116,37 @@ class RemoteExperimentOrchestrator:
         remote_log_dir: str,
     ) -> None:
         log_file = f"{remote_log_dir}/partition-{partition_index:02d}.log"
+
+        def _fmt_path(value: str) -> str:
+            if value.startswith("~/"):
+                return f"$HOME/{value[2:]}"
+            return shlex.quote(value)
+
+        run_cmd = (
+            f"{self.cluster.python_executable} -m experiments.run_experiments "
+            f"--config {_fmt_path(remote_config)} "
+            f"--output {_fmt_path(remote_output)} "
+            f"--partition-index {partition_index} "
+            f"--partition-count {partition_count}"
+        )
         inner_cmd = " && ".join(
             [
                 f"cd {self.cluster.remote_base_dir}",
                 f"mkdir -p {remote_log_dir}",
                 "export PYTHONPATH=${PYTHONPATH}:$PWD/src",
-                "nohup "
-                + shlex.join(
-                    [
-                        self.cluster.python_executable,
-                        "-m",
-                        "experiments.run_experiments",
-                        "--config",
-                        remote_config,
-                        "--output",
-                        remote_output,
-                        "--partition-index",
-                        str(partition_index),
-                        "--partition-count",
-                        str(partition_count),
-                    ]
-                )
-                + f" > {log_file} 2>&1 &",
+                f"nohup {run_cmd} > {_fmt_path(log_file)} 2>&1 &",
             ]
         )
-        proxy = f"{self._proxy_jump},{self.cluster.username}@{self.cluster.head_node}"
-        cmd = [
-            "ssh",
-            "-J",
-            proxy,
-            f"{self.cluster.username}@{node}",
-            inner_cmd,
-        ]
+        cmd = self._ssh_with_jumps(node, via_head=True)
+        cmd.append(inner_cmd)
         self._run(cmd, description=f"Launch partition {partition_index}/{partition_count} on {node}")
 
     def _ssh(self, host: str, command: str, description: str) -> None:
-        cmd = [
-            "ssh",
-            "-J",
-            self._proxy_jump,
-            f"{self.cluster.username}@{host}",
-            command,
-        ]
+        if not self.cluster.gateway and host in {self.cluster.head_node, "localhost", "127.0.0.1"}:
+            self._run(["bash", "-lc", command], description)
+            return
+        cmd = self._ssh_with_jumps(host)
+        cmd.append(command)
         self._run(cmd, description=description)
 
     def _run(self, command: List[str], description: str) -> None:
@@ -143,29 +170,51 @@ def calculate_partitions(configs: Sequence[ExperimentConfig], max_parallel: int,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Deploy experiments to remote fatanode cluster")
-    parser.add_argument("--gateway", required=True, help="SSH gateway hostname")
-    parser.add_argument("--local-config", required=True, type=Path)
+    parser.add_argument("--gateway", help="SSH gateway hostname; omit if already on head node")
+    parser.add_argument(
+        "--local-config",
+        type=Path,
+        default=Path("src/experiments/default_config.json"),
+        help="Local experiment config JSON",
+    )
     parser.add_argument("--local-root", type=Path, default=Path.cwd())
     parser.add_argument("--remote-config", default="~/DynamicalGraphModel/experiments.json")
     parser.add_argument("--remote-output", default="~/DynamicalGraphModel/data/remote_results.csv")
-    parser.add_argument("--remote-log-dir", default="~/DynamicalGraphModel/logs")
+    parser.add_argument(
+        "--remote-log-dir",
+        default=None,
+        help="Remote log directory; defaults to <remote-base-dir>/logs/default-<timestamp>",
+    )
     parser.add_argument("--remote-base-dir", default="~/DynamicalGraphModel")
-    parser.add_argument("--python", default="python3")
+    parser.add_argument("--python", default="~/venvs/dgm/bin/python")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--max-parallel", type=int, default=12)
+    parser.add_argument("--max-parallel", type=int, default=None)
     parser.add_argument("--head-node", default="fatanode-head")
     parser.add_argument("--storage-node", default="fatanode-data")
-    parser.add_argument("--compute-nodes", nargs="*", default=DEFAULT_COMPUTE_NODES)
+    parser.add_argument(
+        "--compute-nodes",
+        nargs="*",
+        default=None,
+        help="Compute nodes to target",
+    )
     args = parser.parse_args()
+
+    compute_nodes = args.compute_nodes or [f"fatanode-{i:02d}" for i in range(1, 7)]
+    max_parallel = args.max_parallel or len(compute_nodes)
+    remote_base_dir = args.remote_base_dir
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    remote_log_dir = args.remote_log_dir or f"{remote_base_dir.rstrip('/')}/logs/default-{timestamp}"
+    remote_config = args.remote_config
+    remote_output = args.remote_output
 
     cluster = RemoteClusterConfig(
         gateway=args.gateway,
         head_node=args.head_node,
         storage_node=args.storage_node,
-        compute_nodes=args.compute_nodes,
-        remote_base_dir=args.remote_base_dir,
+        compute_nodes=compute_nodes,
+        remote_base_dir=remote_base_dir,
         python_executable=args.python,
-        max_parallel_jobs=args.max_parallel,
+        max_parallel_jobs=max_parallel,
     )
 
     orchestrator = RemoteExperimentOrchestrator(cluster, dry_run=args.dry_run)
@@ -176,9 +225,9 @@ def main() -> int:
     print(f"Planning {len(configs)} experiments across {partitions} partitions")
 
     orchestrator.sync_project(args.local_root.expanduser().resolve())
-    orchestrator.push_config(local_config, args.remote_config)
-    orchestrator.ensure_remote_dirs([args.remote_log_dir, str(Path(args.remote_output).parent)])
-    orchestrator.launch_partitions(args.remote_config, args.remote_output, args.remote_log_dir, partitions)
+    orchestrator.push_config(local_config, remote_config)
+    orchestrator.ensure_remote_dirs([remote_log_dir, str(Path(remote_output).parent)])
+    orchestrator.launch_partitions(remote_config, remote_output, remote_log_dir, partitions)
 
     return 0
 
