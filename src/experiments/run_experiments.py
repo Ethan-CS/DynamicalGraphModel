@@ -425,7 +425,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             f"(method={config.method}, iterations={config.iterations})",
             flush=True,
         )
-        results = run_experiment(config, beta=args.beta, gamma=args.gamma)
+        try:
+            results = run_experiment(config, beta=args.beta, gamma=args.gamma)
+        except Exception as exc:  # pylint: disable=broad-except
+            print(
+                f"[{index}/{len(configs)}] FAILED ({type(exc).__name__}: {exc})",
+                flush=True,
+            )
+            continue
+
         write_results(output_path, results)
         total += len(results)
         print(
