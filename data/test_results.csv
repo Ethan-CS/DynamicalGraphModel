@@ -1,0 +1,2 @@
+timestamp,graph_type,num_vertices,graph_params,method,iteration,status,runtime_seconds,num_equations,unique_equations,max_equation_length,solve_runtime_seconds,mc_rounds,mc_final_mean,timeout_seconds,seed,notes
+2025-10-14T18:53:18+00:00,path,5,{},monte_carlo,0,ok,0.014651373028755188,,,,,80,"[0.725, 0.8375, 0.6625, 0.325, 0.0]",2,,

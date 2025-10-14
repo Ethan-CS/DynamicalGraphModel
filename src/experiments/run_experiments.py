@@ -188,14 +188,15 @@ def run_equations_trial(config: ExperimentConfig, graph: nx.Graph, model: CModel
     try:
         with budget.limit("equation generation"):
             equations = generate_equations(graph, model, closures=config.use_closures)
+        typed_equations = cast(Dict[int, Sequence[sym.Eq]], equations)
         if not isinstance(equations, dict):
             raise RuntimeError("Equation generation returned unexpected data structure")
-        row["num_equations"] = count_equations(equations)
-        row["unique_equations"] = count_unique_equations(equations)
-        row["max_equation_length"] = max(equations.keys()) if equations else 0
+        row["num_equations"] = count_equations(typed_equations)
+        row["unique_equations"] = count_unique_equations(typed_equations)
+        row["max_equation_length"] = max(typed_equations.keys()) if typed_equations else 0
 
         if config.solve_equations:
-            lhs_functions = collect_lhs_functions(equations)
+            lhs_functions = collect_lhs_functions(typed_equations)
             init_cond = initial_conditions(
                 list(graph.nodes),
                 lhs_functions,
@@ -204,7 +205,7 @@ def run_equations_trial(config: ExperimentConfig, graph: nx.Graph, model: CModel
             )
             solve_start = time.monotonic()
             with budget.limit("equation solving"):
-                solve_equations(equations, init_cond, graph, config.t_max)
+                solve_equations(typed_equations, init_cond, graph, config.t_max)
             row["solve_runtime_seconds"] = time.monotonic() - solve_start
 
         row["runtime_seconds"] = time.monotonic() - start
@@ -416,12 +417,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("No experiments scheduled after partitioning; exiting.")
         return 0
 
-    all_results: List[Dict[str, object]] = []
-    for config in configs:
-        all_results.extend(run_experiment(config, beta=args.beta, gamma=args.gamma))
+    output_path = Path(args.output)
+    total = 0
+    for index, config in enumerate(configs, start=1):
+        print(
+            f"[{index}/{len(configs)}] Running experiment set for graph_type={config.graph_type} "
+            f"(method={config.method}, iterations={config.iterations})",
+            flush=True,
+        )
+        results = run_experiment(config, beta=args.beta, gamma=args.gamma)
+        write_results(output_path, results)
+        total += len(results)
+        print(
+            f"[{index}/{len(configs)}] Appended {len(results)} rows (cumulative {total}) to {output_path}",
+            flush=True,
+        )
 
-    write_results(Path(args.output), all_results)
-    print(f"Recorded {len(all_results)} result rows to {args.output}")
+    print(f"Recorded {total} result rows to {output_path}")
     return 0
 
 
