@@ -9,7 +9,7 @@ from networkx import Graph
 from equation.Term import Vertex, Term
 from equation.closing import can_be_closed, replace_with_closures
 from model_params.cmodel import CModel
-from model_params.helpers import dynamically_relevant, Coupling, coupling_types
+from model_params.helpers import dynamically_relevant, Coupling, coupling_types, parse_coupling_descriptor
 
 t = sym.symbols('t')
 
@@ -136,6 +136,8 @@ def add_terms(v: Vertex, term: Term, transition: tuple, model: CModel, neighbour
     neighbours_of_v_not_in_tuple = list(set(neighbours_of_v) - set(copy.deepcopy(term).node_list()))
     neighbours_of_v_in_tuple = list(set(copy.deepcopy(term).vertices) - {v})
     terms = []
+    _, _, _, target_state = parse_coupling_descriptor(transition[1])
+    target_state = target_state or v.state
     # Examples relate to vanilla SIR model
     if transition[0] == Coupling.NEIGHBOUR_ENTER:
         # E.G. I state requires something in S coming into contact with something in I
@@ -144,7 +146,7 @@ def add_terms(v: Vertex, term: Term, transition: tuple, model: CModel, neighbour
     elif transition[0] == Coupling.NEIGHBOUR_EXIT:
         # Converse of neighbour enter - S contacts I, transitions to I
         neighbour_exit(model, neighbours_of_v_in_tuple, neighbours_of_v_not_in_tuple, transition[2],
-                       sym.symbols(f'{transition[3]}'), copy.deepcopy(term), terms, transition, v, transition[1][-1])
+                       sym.symbols(f'{transition[3]}'), copy.deepcopy(term), terms, transition, v, target_state)
     elif transition[0] == Coupling.ISOLATED_ENTER:
         # E.G. I -> R without input of neighbours
         isolated_enter(transition[2], sym.symbols(f'{transition[3]}'), copy.deepcopy(term), terms, transition, v)
@@ -161,9 +163,10 @@ def find_neighbour_entries(model, neighbours_of_v_in_tuple, neighbours_of_v_not_
     # e.g. v is in state I, so change v to S and each neighbour in turn to I
     rate_of_transition = transition[2]
     symbol_for_rate_of_transition = sym.symbols(f'{transition[3]}')
-    v_transitions_to = transition[1].split(':')[1][-1]
-    v_starts_as = transition[1].split(':')[1][0]  # the state v would be in before transitioning to current state
-    other_state_for_neighbours = transition[1].split('*')[1][0]
+    _, neighbour_state, source_state, target_state = parse_coupling_descriptor(transition[1])
+    other_state_for_neighbours = neighbour_state or v.state
+    v_starts_as = source_state or v.state  # the state v would be in before transitioning to current state
+    v_transitions_to = target_state or v.state
     # First, look at all external vertices that could lead to entering this state
     for n in neighbours_of_v_not_in_tuple:
         # Make sure new term contains all same terms as original
@@ -182,7 +185,8 @@ def find_neighbour_entries(model, neighbours_of_v_in_tuple, neighbours_of_v_not_
 def neighbour_exit(model, neighbours_of_v_in_tuple, neighbours_of_v_not_in_tuple, rate_of_transition,
                    symbol_for_rate_of_transition, term_clone, terms, transition, v, v_transitions_to):
     # e.g. v in state S so can exit if any neighbour in I
-    other_state_for_neighbours = transition[1].split('*')[1][0]
+    _, neighbour_state, _, _ = parse_coupling_descriptor(transition[1])
+    other_state_for_neighbours = neighbour_state or v.state
     for n in neighbours_of_v_not_in_tuple:
         vertices = set(term_clone.vertices).union({v, Vertex(other_state_for_neighbours, n)})
         term = Term(list(vertices)).function()(sym.symbols('t'))
@@ -203,7 +207,8 @@ def isolated_exit(rate_of_transition, symbol_for_rate_of_transition, term_clone,
 
 def isolated_enter(rate_of_transition, symbol_for_rate_of_transition, term_clone, terms, transition, v):
     # e.g. v in state R, gets there through recovery after being in I
-    other_state_for_v = transition[1].split(':')[1][0]
+    _, _, source_state, _ = parse_coupling_descriptor(transition[1])
+    other_state_for_v = source_state or v.state
     vertices = set(term_clone.vertices).union({Vertex(other_state_for_v, v.node)})
     term = Term(list(vertices)).function()(sym.symbols('t'))
     return append_term_to_terms(rate_of_transition, symbol_for_rate_of_transition, term, terms)

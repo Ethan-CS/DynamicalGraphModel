@@ -50,7 +50,7 @@ models and contact networks for particular initial conditions) is provided in th
 Our software answers an open question from [@kiss:2017] by facilitating algorithmic generation and solving of equations
 describing compartmental models with underlying contact networks. Others have written their own software to generate 
 equations for systems up to a certain length of terms (usually terms on one and two vertices), which approximates the 
-system dynamics - see, for example, [@sharkey:2011],. Instead, our software generates and solves equations up to the 
+system dynamics - see, for example, [@sharkey:2011]. Instead, our software generates and solves equations up to the 
 full system size, yielding full, complete and deterministic representations of  model dynamics.
 
 The more usual approach to obtaining modelling results for compartmental models on contact networks is to use a 
