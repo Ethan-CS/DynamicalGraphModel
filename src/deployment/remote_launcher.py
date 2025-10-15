@@ -49,8 +49,12 @@ class RemoteExperimentOrchestrator:
     def _ssh_base(self) -> List[str]:
         return ["ssh", *self._common_ssh_options]
 
-    def _ssh_with_jumps(self, host: str, via_head: bool = False) -> List[str]:
+    def _ssh_with_jumps(self, host: str, via_head: bool = False, background: bool = False) -> List[str]:
         cmd = self._ssh_base()
+        if background:
+            # Detach the ssh client so remote experiments don't block local dispatch.
+            cmd.insert(1, "-f")
+            cmd.insert(2, "-n")
         jumps: List[str] = []
         proxy = self._proxy_jump
         if proxy:
@@ -142,7 +146,7 @@ class RemoteExperimentOrchestrator:
                 f"nohup {run_cmd} > {_fmt_path(log_file)} 2>&1 &",
             ]
         )
-        cmd = self._ssh_with_jumps(node, via_head=True)
+        cmd = self._ssh_with_jumps(node, via_head=True, background=True)
         cmd.append(inner_cmd)
         self._run(cmd, description=f"Launch partition {partition_index}/{partition_count} on {node}")
 
