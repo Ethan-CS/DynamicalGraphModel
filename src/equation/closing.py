@@ -4,7 +4,7 @@ import networkx as nx
 import sympy as sym
 from networkx import Graph
 
-from equation.Term import Term, Vertex
+from src.equation.Term import Term, Vertex
 
 
 def find_cut_vertices(graph: Graph):

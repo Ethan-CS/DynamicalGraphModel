@@ -3,9 +3,10 @@ from time import time
 import networkx as nx
 import sympy as sym
 
-from equation.generation import generate_equations
-from equation.solving import initial_conditions, solve_equations
-from model_params.cmodel import CModel, get_SIR
+from src.equation.Term import Vertex, Term
+from src.equation.generation import generate_equations
+from src.equation.solving import initial_conditions, solve_equations
+from src.model_params.cmodel import CModel, get_SIR
 
 
 def main():
@@ -22,6 +23,8 @@ def main():
     print(model.couplings)
 
     graph = nx.Graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4)])
+
+    get_and_solve_equations(graph, closures=False, t_max=10, model=model)
 
     print(f'without closures={count_equations(generate_equations(graph, model, closures=False), False)}')
     print(f'   with closures={count_equations(generate_equations(graph, model, closures=True), False)}')
@@ -44,8 +47,10 @@ def get_and_solve_equations(graph, closures, t_max, model=get_SIR()):
     for list_of_eqn in equations.values():
         for each_eqn in list_of_eqn:
             LHS.append(sym.Integral(each_eqn.lhs).doit())
-    func = [sym.Function(str(type(f)))('t') for f in list(LHS)]
-    init_conditions = initial_conditions(list(graph.nodes), functions=func)
+    init_conditions = {}
+    # for each node, we need: (each state) * (each node), then terms up to length = num of vertices of (each state) * (each node), (each state) * (each other node))
+    for key in init_conditions:
+        print(f'{key}={init_conditions[key]}')
     solve_equations(equations, init_conditions, graph, t_max)
     end = time() - start
     return end

@@ -4,8 +4,8 @@ from time import time
 import sympy as sym
 from scipy.integrate import solve_ivp
 
-from equation.Term import Vertex
-from equation.generation import format_term
+from src.equation.Term import Vertex
+from src.equation.generation import format_term
 
 
 def initial_conditions(nodes, functions, choice=None, num_initial_infected=1, symbol=0, yes=1, no=0):
