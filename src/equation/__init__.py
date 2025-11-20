@@ -69,8 +69,8 @@ def count_equations(equations, verbose=False):
         for e in equations[num]:
             count += 1
             if verbose:
-                print(f'\dot{{{sym.Integral(e.lhs).doit()}}} &= {e.rhs}\\\\'
-                      .replace('〈', '\langle ').replace('〉', '\\rangle ').replace('*', ''))
+                print(f'\dot{{{sym.Integral(e.lhs).doit()}}} &= {e.rhs}\\\\' # type: ignore
+                      .replace('〈', '\langle ').replace('〉', '\\rangle ').replace('*', '')) # type: ignore
     return count
 
 

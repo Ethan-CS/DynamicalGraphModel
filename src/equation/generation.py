@@ -36,9 +36,9 @@ def get_single_equations(g, model):
     return singles_equations, lhs
 
 
-def generate_equations(g, model, length=2, closures=False, prev_equations=None, lhs_terms=None):
+def generate_equations(g, model, length=2, closures=False, prev_equations=None, lhs_terms=None, term_cap=None):
     """
-   Generates the required equations for the model defined by the specified contact network and compartmental model.
+    Generates the required equations for the model defined by the specified contact network and compartmental model.
 
    Parameters
    ----------
@@ -55,6 +55,9 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None, 
         True if we are introducing moment closures on cut-vertices, false otherwise.
     lhs_terms : list
         All terms for which we already have equations.
+    term_cap : int | None
+        Maximum size (number of vertices) of terms that should receive equations. Defaults to the
+        total number of vertices in the graph, i.e. the full system.
 
    Returns
    -------
@@ -62,6 +65,16 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None, 
    """
     # If there are no cut vertices, set closures to false as no terms can be closed.
     closures = closures and len(list(nx.articulation_points(g))) > 0
+    if term_cap is None:
+        max_term_length = g.number_of_nodes()
+    else:
+        try:
+            max_term_length = int(term_cap)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("term_cap must be an integer") from exc
+        if max_term_length < 1:
+            raise ValueError("term_cap must be at least 1")
+        max_term_length = min(max_term_length, g.number_of_nodes())
     # If no prev equations provided, get the base case (singles equations)
     if prev_equations is None:
         prev_equations, lhs_terms = get_single_equations(g, model)
@@ -72,25 +85,26 @@ def generate_equations(g, model, length=2, closures=False, prev_equations=None, 
     equations = prev_equations
     # Look through RHS terms of previous equations and add eqn for any terms that don't have one yet
     terms = get_rhs_terms(equations, min(length, g.number_of_nodes()), lhs_terms)
-    get_specified_equations(terms, equations, lhs_terms, g, model, closures)
-    # Increase length we are interested in by 1 and recur if length < num vertices in graph
-    if length <= g.number_of_nodes() and len(equations[length]) > 0:
-        generate_equations(g, model, length+1, closures, equations, lhs_terms)
+    get_specified_equations(terms, equations, lhs_terms, g, model, closures, max_term_length)
+    # Increase length we are interested in by 1 and recur to propagate RHS dependencies.
+    if length < g.number_of_nodes() and len(equations[length]) > 0:
+        generate_equations(g, model, length+1, closures, equations, lhs_terms, max_term_length)
 
     return equations
 
 
-def get_specified_equations(terms, equations, lhs_terms, g, model, closures):
+def get_specified_equations(terms, equations, lhs_terms, g, model, closures, max_term_length):
     for term in terms:
         term = Term(term)
         # If term is up to length we're considering and not already in system, add equation for it
         new_term = term.function()
         time = sym.symbols('t')
-        if new_term not in lhs_terms:
+        term_length = len(term.vertices)
+        if new_term not in lhs_terms and term_length <= max_term_length:
             if not closures or (closures and not can_be_closed(term, g)):
                 eq_rhs = chain_rule(term, g, model, closures)
                 next_equation = sym.Eq(sym.Derivative(term.function()(time)), eq_rhs)
-                equations[len(str(term).split(" "))].append(next_equation)
+                equations[term_length].append(next_equation)
                 lhs_terms.append(new_term)
             elif can_be_closed(term, g):
                 closure_terms = replace_with_closures(term.function(), g)
@@ -99,10 +113,12 @@ def get_specified_equations(terms, equations, lhs_terms, g, model, closures):
                         sub_term = Term(str(1/sub_term))
                     if type(sub_term) is not Term:
                         sub_term = Term(sub_term)
+                    sub_term_length = len(sub_term.vertices)
                     fn = sub_term.function()
-                    if fn not in lhs_terms and fn(time) not in lhs_terms:
+                    if (fn not in lhs_terms and fn(time) not in lhs_terms
+                            and sub_term_length <= max_term_length):
                         next_from_closures = sym.Eq(sym.Derivative(fn(time)), chain_rule(sub_term, g, model, closures))
-                        equations[len(str(sub_term).split(" "))].append(next_from_closures)
+                        equations[sub_term_length].append(next_from_closures)
                         lhs_terms.append(fn)
 
 

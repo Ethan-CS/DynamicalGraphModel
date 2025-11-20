@@ -4,7 +4,8 @@ from time import time
 import sympy as sym
 from scipy.integrate import solve_ivp
 
-from src.equation.Term import Vertex
+from src.equation.Term import Term, Vertex
+from src.equation.closing import can_be_closed, replace_with_closures
 from src.equation.generation import format_term
 
 
@@ -70,6 +71,26 @@ def solve_equations(full_equations, init_conditions, graph, t_max):
                  print_option='none')
 
 
+MIN_STATE_VALUE = 1e-9
+TIME_SYMBOL = sym.symbols('t')
+
+
+def _coerce_numeric_symbols(expr):
+    replacements = {}
+    for symbol in expr.atoms(sym.Symbol):
+        try:
+            replacements[symbol] = float(str(symbol))
+        except ValueError:
+            continue
+    return expr.xreplace(replacements) if replacements else expr
+
+
+def _stabilise_value(value: float) -> float:
+    if abs(value) < MIN_STATE_VALUE:
+        return MIN_STATE_VALUE if value >= 0 else -MIN_STATE_VALUE
+    return value
+
+
 def solve(full_equations, g, init_cond=None, t_max=10, step=1e-2, rtol=1e-2, atol=1e-4, print_option='none'):
     # Solves a system of equations given parameters (equations, tolerances, max timestep, initial conditions)
     LHS, RHS = [], []
@@ -81,20 +102,71 @@ def solve(full_equations, g, init_cond=None, t_max=10, step=1e-2, rtol=1e-2, ato
         print(' *** Equations to solve ***')
         print(*list(zip(LHS, RHS)), sep='\n')
 
+    closure_cache = {}
+
     def rhs(_, y_vec):
         # y_vec just contains values. We need to replace
         # terms in equations with corresponding values
         substitutions = {}  # dict with symbols as keys and corresponding y_vec at pos. as values
         j = 0
         for lhs in LHS:
-            substitutions[lhs] = y_vec[j]
+            substitutions[lhs] = _stabilise_value(float(y_vec[j]))
             j += 1
+
+        def _resolve_function(func):
+            if func in substitutions:
+                return substitutions[func]
+            if func in closure_cache:
+                return closure_cache[func]
+            term = Term(func)
+            if not can_be_closed(term, g):
+                # Fall back to mean-field factorisation when closures are unavailable.
+                estimate = 1.0
+                for vertex in term.vertices:
+                    single_term = Term([vertex])
+                    single_func = single_term.function()(TIME_SYMBOL)
+                    if single_func not in substitutions:
+                        raise KeyError(f"No equation available for base term {single_term}")
+                    estimate *= substitutions[single_func]
+                closure_cache[func] = estimate
+                return estimate
+            product = sym.Integer(1)
+            for component in replace_with_closures(term, g):
+                product *= component
+            value = _ensure_numeric(product)
+            closure_cache[func] = value
+            return value
+
+        def _ensure_numeric(expr):
+            expr_sub = expr
+            for func in expr_sub.atoms(sym.Function):
+                if func not in substitutions:
+                    substitutions[func] = _resolve_function(func)
+            expr_sub = expr_sub.xreplace(substitutions)
+            expr_sub = _coerce_numeric_symbols(expr_sub)
+            try:
+                return float(expr_sub)
+            except TypeError as exc:  # pragma: no cover - diagnostic path
+                symbols = expr_sub.atoms(sym.Symbol)
+                raise TypeError(
+                    f"Cannot convert '{expr_sub}' to float; residual symbols: {symbols}"
+                ) from exc
+
+        def _augment_substitutions(expr):
+            for func in expr.atoms(sym.Function):
+                if func not in substitutions:
+                    substitutions[func] = _resolve_function(func)
         # print(substitutions)
         # Make the substitutions and store the results in a list
         derivatives = []
         for r in list(RHS):
-            r_sub = r.xreplace(substitutions)
-            derivatives.append(r_sub)  # indices should be consistent over LHS, y_vec and derivatives
+            _augment_substitutions(r)
+            try:
+                derivatives.append(_ensure_numeric(r))
+            except Exception as exc:  # pylint: disable=broad-except
+                raise TypeError(
+                    f"Unable to convert expression '{r}' after substitutions to float ({type(exc).__name__}: {exc})."
+                ) from exc
         return derivatives
 
     y0 = []

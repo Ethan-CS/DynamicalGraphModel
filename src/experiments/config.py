@@ -16,6 +16,7 @@ class ExperimentConfig:
     timeout: int = 600
     t_max: int = 15
     use_closures: bool = True
+    term_length_cap: Optional[int] = None
     solve_equations: bool = False
     num_initial_infected: int = 1
     tolerance: float = 1e-2
@@ -32,6 +33,7 @@ class ExperimentConfig:
             "timeout": self.timeout,
             "t_max": self.t_max,
             "use_closures": self.use_closures,
+            "term_length_cap": self.term_length_cap,
             "solve_equations": self.solve_equations,
             "num_initial_infected": self.num_initial_infected,
             "tolerance": self.tolerance,
@@ -63,6 +65,12 @@ class ExperimentConfig:
         if seed is not None:
             seed = int(seed)
 
+        term_length_cap = data.get("term_length_cap")
+        if term_length_cap is not None:
+            term_length_cap = int(term_length_cap)
+            if term_length_cap < 1:
+                raise ValueError("'term_length_cap' must be a positive integer when provided")
+
         return cls(
             graph_type=str(graph_type),
             num_vertices=int(data.get("num_vertices", 100)),
@@ -72,6 +80,7 @@ class ExperimentConfig:
             timeout=int(data.get("timeout", 600)),
             t_max=int(data.get("t_max", 15)),
             use_closures=bool(data.get("use_closures", True)),
+            term_length_cap=term_length_cap,
             solve_equations=bool(data.get("solve_equations", False)),
             num_initial_infected=int(data.get("num_initial_infected", 1)),
             tolerance=float(data.get("tolerance", 1e-2)),

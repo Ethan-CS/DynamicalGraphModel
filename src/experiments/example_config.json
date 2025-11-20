@@ -9,6 +9,7 @@
       "timeout": 900,
       "t_max": 20,
       "use_closures": true,
+      "term_length_cap": null,
       "solve_equations": false,
       "num_initial_infected": 1,
       "tolerance": 0.01
@@ -22,6 +23,7 @@
       "timeout": 900,
       "t_max": 20,
       "use_closures": true,
+      "term_length_cap": null,
       "solve_equations": false,
       "num_initial_infected": 1,
       "tolerance": 0.01

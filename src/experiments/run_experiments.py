@@ -58,6 +58,7 @@ CLI_DEFAULTS = {
     "num_initial_infected": 1,
     "tolerance": 1e-2,
     "seed": None,
+    "term_length_cap": None,
 }
 
 
@@ -187,7 +188,12 @@ def run_equations_trial(config: ExperimentConfig, graph: nx.Graph, model: CModel
 
     try:
         with budget.limit("equation generation"):
-            equations = generate_equations(graph, model, closures=config.use_closures)
+            equations = generate_equations(
+                graph,
+                model,
+                closures=config.use_closures,
+                term_cap=config.term_length_cap,
+            )
         typed_equations = cast(Dict[int, Sequence[sym.Eq]], equations)
         if not isinstance(equations, dict):
             raise RuntimeError("Equation generation returned unexpected data structure")
@@ -330,6 +336,7 @@ def load_configs(args: argparse.Namespace) -> List[ExperimentConfig]:
             timeout=args.timeout,
             t_max=args.t_max,
             use_closures=not args.disable_closures,
+            term_length_cap=args.term_length_cap,
             solve_equations=args.solve_equations,
             num_initial_infected=args.num_initial_infected,
             tolerance=args.tolerance,
@@ -402,6 +409,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--num-initial-infected", type=int, default=1)
     parser.add_argument("--tolerance", type=float, default=1e-2)
     parser.add_argument("--seed", type=int)
+    parser.add_argument("--term-length-cap", type=int, dest="term_length_cap",
+                        help="Maximum term size that should receive its own equation")
     parser.add_argument("--beta", type=float, default=0.5)
     parser.add_argument("--gamma", type=float, default=0.1)
     parser.add_argument("--output", type=str, default="data/experiment_results.csv")

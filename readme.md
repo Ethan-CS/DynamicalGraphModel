@@ -12,11 +12,13 @@ This project is used in a publication[^1] that assesses more broadly this approa
    - Compartmental models can be as simple as SIR (`model_params.CModel` contains a getter method for the usual form of this) 
    - Graphs can be generated using `networkx` methods for simple graph classes or user-specified
    - Initial conditions can be generated using helper methods - see example usage in the `__init__` file
+- To approximate the dynamics, pass `term_cap=<max_size>` to `equation.generation.generate_equations`. Terms with more vertices can still appear on the RHS, but only terms up to the cap receive their own equations. Omitting the cap (the default) reproduces the full system.
 - If you'd like to compare to a Monte Carlo simulation, go to `monte_carlo.equation_MC_comparison.py` for examples used in the associated publication
 
 ## Large-scale experiments
 
 - Use `PYTHONPATH=src python -m experiments.run_experiments --help` to discover the CLI for running larger runtimes, including 100-vertex graphs, multiple graph families, and long timeouts. Experiments can be described ad-hoc via flags or via a JSON file (see `experiments/config.py`).
+- Supply `--term-length-cap <int>` (or `"term_length_cap"` in a JSON config) to truncate the system during generation while keeping the default as a full model when the flag is omitted.
 - If `--config` is omitted the runner automatically consumes `src/experiments/default_config.json`, which spans Erdős–Rényi, Barabási–Albert, Watts–Strogatz, random regular, and random geometric graphs at 100 vertices with extended timeouts.
 - Results are appended to `data/experiment_results.csv` by default; override with `--output`.
 

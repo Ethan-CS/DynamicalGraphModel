@@ -28,7 +28,7 @@ def test_can_be_closed():
 
 def test_num_eqn_lollipop():
     lollipop_adj = np.array([[0, 1, 1, 0], [1, 0, 1, 1], [1, 1, 0, 0], [0, 1, 0, 0]])
-    lollipop = networkx.from_numpy_matrix(lollipop_adj)
+    lollipop = networkx.from_numpy_array(lollipop_adj)
     all_equations = generate_equations(copy.deepcopy(lollipop), SIR)
     assert len(set().union(*all_equations.values())) == 35
 
@@ -44,12 +44,16 @@ def test_num_eqn_path():
         path = networkx.path_graph(i)
 
         all_equations = generate_equations(copy.deepcopy(path), SIR)
-        assert len(all_equations) == actual_without_closures, f'expected\n{actual_without_closures}, ' \
-                                                              f'got\n{[each.lhs.lhs for each in all_equations]}'
+        total_equations = sum(len(group) for group in all_equations.values())
+        assert total_equations == actual_without_closures, (
+            f'expected {actual_without_closures}, got {total_equations}'
+        )
 
         closed_equations = generate_equations(copy.deepcopy(path), SIR, closures=True)
-        assert len(closed_equations) == actual_with_closures, f'expected\n{actual_with_closures}, ' \
-                                                              f'got\n{[each.lhs for each in closed_equations]}'
+        closed_total = sum(len(group) for group in closed_equations.values())
+        assert closed_total == actual_with_closures, (
+            f'expected {actual_with_closures}, got {closed_total}'
+        )
 
 
 def run_all():
