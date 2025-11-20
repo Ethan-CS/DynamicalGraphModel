@@ -161,4 +161,7 @@ def run_measure():
     #         measure_runtimes(graph_type, v, iterations, p, t_max, method, timeout, file)
 
 
-run_measure()
+if __name__ == '__main__':  # pragma: no cover
+    from experiments.run_experiments import main as experiments_main
+
+    raise SystemExit(experiments_main())

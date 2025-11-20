@@ -16,7 +16,7 @@ sns.set_context('notebook')
 sns.set_style("ticks")
 
 # Avoids an annoying error on macOS
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
 
 
 # Used to produce a scatter plot comparing the time performance of two methods that achieve the same result

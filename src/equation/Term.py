@@ -1,4 +1,5 @@
 import re
+from bisect import insort
 
 import sympy as sym
 
@@ -18,86 +19,62 @@ class Term:
     """
     def __init__(self, _vertices):
         assert _vertices != [], 'Vertex list is empty'
-        if type(_vertices) == Term:
-            _vertices = _vertices.vertices()
+        if isinstance(_vertices, Term):
+            _vertices = list(_vertices.vertices)
 
-        if type(_vertices) == sym.Function:
+        if isinstance(_vertices, sym.Function):
             _vertices = str(_vertices.func)
-        elif type(_vertices) is not list:
+        elif not isinstance(_vertices, list):
             _vertices = str(_vertices)
 
-        if type(_vertices) == str:
+        if isinstance(_vertices, str):
             _vertices = vertices_to_list(_vertices)
-        assert type(_vertices) == list, f'Vertex set must be a list, you provided:' \
-                                        f'\nVertex set: {_vertices}, type: {type(_vertices)}'
+        assert isinstance(_vertices, list), f'Vertex set must be a list, you provided:' \
+                                            f'\nVertex set: {_vertices}, type: {type(_vertices)}'
         for v in _vertices:
-            assert type(v) == Vertex, f'not all entries in provided list were vertices: {v}'
-        self._vertices = _vertices
+            assert isinstance(v, Vertex), f'not all entries in provided list were vertices: {v}'
+        self._vertices = sorted(_vertices)
 
     def __str__(self):
-        self._vertices.sort()
-        string = ""
-        for v in self._vertices:
-            if type(v) == Vertex:
-                string += f"{v.state}_{v.node} "
-            else:
-                string += f"{v} "
-        string = "\u3008" + string[:-1] + "\u3009"
-        return string
+        string = " ".join(
+            f"{v.state}_{v.node}" if isinstance(v, Vertex) else f"{v}"
+            for v in self._vertices
+        )
+        return "\u3008" + string + "\u3009"
 
     def latex_print(self):
-        self._vertices.sort()
-        string = ""
-        for v in self._vertices:
-            if type(v) == Vertex:
-                string += f"{v.state}_{v.node} "
-            else:
-                string += f"{v} "
-        string = "\\langle" + string[:-1] + "\\rangle"
-        return string
+        string = " ".join(
+            f"{v.state}_{v.node}" if isinstance(v, Vertex) else f"{v}"
+            for v in self._vertices
+        )
+        return "\\langle" + string + "\\rangle"
 
     def add(self, vertex):
-        self._vertices.append(vertex)
-        self._vertices.sort()
+        insort(self._vertices, vertex)
 
     def function(self):
         return sym.Function(str(self))
 
     @property
     def vertices(self):
-        return self._vertices
+        return tuple(self._vertices)
 
     def __eq__(self, other):
-        if type(other) == Term:
-            if len(self.vertices) != len(other.vertices):
-                return False
-            for v in self.vertices:
-                if v not in other.vertices:
-                    return False
-            for w in other.vertices:
-                if w not in self.vertices:
-                    return False
-            return True
-        else:
-            return False
+        if isinstance(other, Term):
+            return self._vertices == other._vertices
+        return False
 
     def __hash__(self):
-        return tuple(self._vertices).__hash__()
+        return hash(tuple(self._vertices))
 
     def node_list(self):
-        nodes = []
-        for v in self.vertices:
-            if type(v) == Vertex:
-                nodes.append(v.node)
-            else:
-                nodes.append(v)
-        return nodes
+        return [v.node if isinstance(v, Vertex) else v for v in self._vertices]
 
     def state_of(self, vertex):
         for v in self._vertices:
             if v == vertex:
                 return ' '
-            elif v.node == vertex:
+            if isinstance(v, Vertex) and v.node == vertex:
                 return v.state
 
     def remove(self, v):
@@ -105,7 +82,7 @@ class Term:
 
 
 class Vertex:
-    def __init__(self, state: chr, node: int):
+    def __init__(self, state: str, node: int):
         self.state = state
         # assert type(node) == int, f'the vertex {node} is not an int, instead {type(node)}'
         self.node = int(node)
