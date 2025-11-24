@@ -29,6 +29,7 @@ RESULT_FIELDS = [
     "graph_type",
     "num_vertices",
     "graph_params",
+    "config_tag",
     "method",
     "iteration",
     "status",
@@ -37,6 +38,7 @@ RESULT_FIELDS = [
     "unique_equations",
     "max_equation_length",
     "solve_runtime_seconds",
+    "solution_path",
     "mc_rounds",
     "mc_final_mean",
     "timeout_seconds",
@@ -181,10 +183,60 @@ def count_unique_equations(equations: Dict[int, Sequence[sym.Eq]]) -> int:
     return len(unique)
 
 
-def run_equations_trial(config: ExperimentConfig, graph: nx.Graph, model: CModel, iteration: int) -> Dict[str, object]:
+def _slug(text: str) -> str:
+    slug = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in text)
+    return slug or "untagged"
+
+
+def _serialize_solution(
+    solution: Any,
+    lhs_functions: Sequence[sym.Expr],
+    solution_dir: Optional[Path],
+    config: ExperimentConfig,
+    iteration: int,
+) -> Optional[str]:
+    if solution_dir is None or solution is None:
+        return None
+    try:
+        solution_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return None
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+    tag_bits = [config.graph_type, f"n{config.num_vertices}"]
+    if config.tag:
+        tag_bits.append(config.tag)
+    filename = f"{'-'.join(_slug(bit) for bit in tag_bits)}-iter{iteration}-{timestamp}.json"
+    target = solution_dir / filename
+    payload = {
+        "graph_type": config.graph_type,
+        "num_vertices": config.num_vertices,
+        "config_tag": config.tag,
+        "iteration": iteration,
+        "success": bool(getattr(solution, "success", False)),
+        "status_message": getattr(solution, "message", None),
+        "t": [float(value) for value in getattr(solution, "t", [])],
+        "y": np.asarray(getattr(solution, "y", [])).tolist(),
+        "lhs_functions": [str(fn) for fn in lhs_functions],
+    }
+    try:
+        target.write_text(json.dumps(payload, ensure_ascii=True))
+    except OSError:
+        return None
+    return str(target)
+
+
+def run_equations_trial(
+    config: ExperimentConfig,
+    graph: nx.Graph,
+    model: CModel,
+    iteration: int,
+    solution_dir: Optional[Path] = None,
+) -> Dict[str, object]:
     row = base_row(config, method="equations", iteration=iteration)
     start = time.monotonic()
     budget = TimeoutBudget(config.timeout)
+    row["solution_path"] = None
 
     try:
         with budget.limit("equation generation"):
@@ -211,8 +263,11 @@ def run_equations_trial(config: ExperimentConfig, graph: nx.Graph, model: CModel
             )
             solve_start = time.monotonic()
             with budget.limit("equation solving"):
-                solve_equations(typed_equations, init_cond, graph, config.t_max)
+                solution = solve_equations(typed_equations, init_cond, graph, config.t_max)
             row["solve_runtime_seconds"] = time.monotonic() - solve_start
+            solution_path = _serialize_solution(solution, lhs_functions, solution_dir, config, iteration)
+            if solution_path:
+                row["solution_path"] = solution_path
 
         row["runtime_seconds"] = time.monotonic() - start
         row["status"] = "ok"
@@ -276,6 +331,7 @@ def base_row(config: ExperimentConfig, method: str, iteration: int) -> Dict[str,
         "graph_type": config.graph_type,
         "num_vertices": config.num_vertices,
         "graph_params": json.dumps(config.graph_params, sort_keys=True, default=str),
+        "config_tag": config.tag,
         "method": method,
         "iteration": iteration,
         "status": "pending",
@@ -284,6 +340,7 @@ def base_row(config: ExperimentConfig, method: str, iteration: int) -> Dict[str,
         "unique_equations": None,
         "max_equation_length": None,
         "solve_runtime_seconds": None,
+        "solution_path": None,
         "mc_rounds": None,
         "mc_final_mean": None,
         "timeout_seconds": config.timeout,
@@ -297,7 +354,12 @@ def build_model(beta: float, gamma: float) -> CModel:
     return model
 
 
-def run_experiment(config: ExperimentConfig, beta: float, gamma: float) -> List[Dict[str, object]]:
+def run_experiment(
+    config: ExperimentConfig,
+    beta: float,
+    gamma: float,
+    solution_dir: Optional[Path] = None,
+) -> List[Dict[str, object]]:
     if config.seed is not None:
         random.seed(config.seed)
         np.random.seed(config.seed)
@@ -308,7 +370,7 @@ def run_experiment(config: ExperimentConfig, beta: float, gamma: float) -> List[
 
     for iteration in range(config.iterations):
         if config.method in {"equations", "both"}:
-            results.append(run_equations_trial(config, graph, model, iteration))
+            results.append(run_equations_trial(config, graph, model, iteration, solution_dir=solution_dir))
         if config.method in {"monte_carlo", "mc", "both"}:
             results.append(run_monte_carlo_trial(config, graph, model, iteration))
 
@@ -414,6 +476,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--beta", type=float, default=0.5)
     parser.add_argument("--gamma", type=float, default=0.1)
     parser.add_argument("--output", type=str, default="data/experiment_results.csv")
+    parser.add_argument("--solution-dir", type=str, help="Directory to store serialized ODE solutions")
     parser.add_argument("--partition-index", type=int)
     parser.add_argument("--partition-count", type=int)
 
@@ -427,6 +490,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
 
     output_path = Path(args.output)
+    solution_dir = Path(args.solution_dir).expanduser() if args.solution_dir else None
     total = 0
     for index, config in enumerate(configs, start=1):
         print(
@@ -435,7 +499,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             flush=True,
         )
         try:
-            results = run_experiment(config, beta=args.beta, gamma=args.gamma)
+            results = run_experiment(config, beta=args.beta, gamma=args.gamma, solution_dir=solution_dir)
         except Exception as exc:  # pylint: disable=broad-except
             print(
                 f"[{index}/{len(configs)}] FAILED ({type(exc).__name__}: {exc})",

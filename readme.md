@@ -20,7 +20,7 @@ This project is used in a publication[^1] that assesses more broadly this approa
 - Use `PYTHONPATH=src python -m experiments.run_experiments --help` to discover the CLI for running larger runtimes, including 100-vertex graphs, multiple graph families, and long timeouts. Experiments can be described ad-hoc via flags or via a JSON file (see `experiments/config.py`).
 - Supply `--term-length-cap <int>` (or `"term_length_cap"` in a JSON config) to truncate the system during generation while keeping the default as a full model when the flag is omitted.
 - If `--config` is omitted the runner automatically consumes `src/experiments/default_config.json`, which spans Erdős–Rényi, Barabási–Albert, Watts–Strogatz, random regular, and random geometric graphs at 100 vertices with extended timeouts.
-- Results are appended to `data/experiment_results.csv` by default; override with `--output`.
+- Results are appended to `data/experiment_results.csv` by default; override with `--output`. Pass `--solution-dir <path>` to serialize each successful ODE solve (time grid, state vectors, tag metadata) alongside the CSV row for downstream comparison of truncation strategies.
 
 ## Remote deployment on fatanodes
 

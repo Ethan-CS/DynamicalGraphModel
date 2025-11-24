@@ -26,6 +26,7 @@ class RemoteClusterConfig:
     python_executable: str = "python3"
     max_parallel_jobs: int = 12
     rsync_excludes: Sequence[str] = field(default_factory=lambda: list(DEFAULT_EXCLUDES))
+    extra_run_args: Sequence[str] = field(default_factory=list)
 
 
 class RemoteExperimentOrchestrator:
@@ -131,13 +132,27 @@ class RemoteExperimentOrchestrator:
                 return f"$HOME/{value[2:]}"
             return shlex.quote(value)
 
-        run_cmd = (
-            f"{self.cluster.python_executable} -m experiments.run_experiments "
-            f"--config {_fmt_path(remote_config)} "
-            f"--output {_fmt_path(remote_output)} "
-            f"--partition-index {partition_index} "
-            f"--partition-count {partition_count}"
-        )
+        def _fmt_arg(token: str) -> str:
+            if token.startswith("$HOME/"):
+                return token
+            return shlex.quote(token)
+
+        run_args = [
+            _fmt_path(self.cluster.python_executable),
+            "-m",
+            "experiments.run_experiments",
+            "--config",
+            _fmt_path(remote_config),
+            "--output",
+            _fmt_path(remote_output),
+            "--partition-index",
+            str(partition_index),
+            "--partition-count",
+            str(partition_count),
+        ]
+        if self.cluster.extra_run_args:
+            run_args.extend(self.cluster.extra_run_args)
+        run_cmd = " ".join(_fmt_arg(arg) for arg in run_args)
         inner_cmd = " && ".join(
             [
                 f"cd {self.cluster.remote_base_dir}",

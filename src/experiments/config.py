@@ -22,6 +22,7 @@ class ExperimentConfig:
     tolerance: float = 1e-2
     target_average: Optional[Dict[str, float]] = None
     seed: Optional[int] = None
+    tag: Optional[str] = None
 
     def to_dict(self) -> Dict[str, object]:
         return {
@@ -39,6 +40,7 @@ class ExperimentConfig:
             "tolerance": self.tolerance,
             "target_average": self.target_average,
             "seed": self.seed,
+            "tag": self.tag,
         }
 
     @classmethod
@@ -86,5 +88,6 @@ class ExperimentConfig:
             tolerance=float(data.get("tolerance", 1e-2)),
             target_average=target_average,
             seed=seed,
+            tag=str(data["tag"]) if data.get("tag") is not None else None,
         )
 
