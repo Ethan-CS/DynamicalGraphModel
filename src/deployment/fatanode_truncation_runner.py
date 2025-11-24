@@ -111,7 +111,12 @@ def main() -> int:
     remote_output = args.remote_output or f"{remote_base}/data/fatanode_truncation_{timestamp}.csv"
     remote_solution_dir = args.remote_solution_dir or f"{remote_base}/data/truncation_solutions/{timestamp}"
     remote_log_dir = args.remote_log_dir or f"{remote_base}/logs/truncation-{timestamp}"
-    remote_paths = [remote_log_dir, str(Path(remote_output).parent), remote_solution_dir]
+    remote_paths = [
+        remote_log_dir,
+        str(Path(remote_output).parent),
+        remote_solution_dir,
+        str(Path(remote_config).parent),
+    ]
 
     compute_nodes = args.compute_nodes or [f"fatanode-{i:02d}" for i in range(1, 5)]
     max_parallel = args.max_parallel or len(compute_nodes)
@@ -136,8 +141,8 @@ def main() -> int:
     )
 
     orchestrator.sync_project(args.local_root.expanduser().resolve())
-    orchestrator.push_config(local_config, remote_config)
     orchestrator.ensure_remote_dirs(remote_paths)
+    orchestrator.push_config(local_config, remote_config)
     orchestrator.launch_partitions(remote_config, remote_output, remote_log_dir, partitions)
     print("Remote launch initiated")
     return 0
