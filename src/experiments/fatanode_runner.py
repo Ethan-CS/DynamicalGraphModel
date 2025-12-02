@@ -1,23 +1,32 @@
+"""Run truncation experiments on small graphs mirroring the truncation demo logic.
+
+For each requested graph we generate the full, closed and some truncated
+systems, solve them with a shared set of initial conditions, and compare the
+truncated trajectories to the closed/full baselines. Generation and solve times
+plus aggregate error metrics are appended to a CSV for later analysis.
+"""
+
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
-import json
-import os
 import socket
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, cast
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import networkx as nx
 import numpy as np
 import sympy as sym
 
-# Ensure local src imports when run as a script
-import sys as _sys, pathlib as _pl
+# Ensure local src imports when run directly
+import sys as _sys
+import pathlib as _pl
+
 _root = _pl.Path(__file__).resolve().parents[2]
-_src = _root / 'src'
+_src = _root / "src"
 if str(_src) not in _sys.path:
     _sys.path.insert(0, str(_src))
 
@@ -27,301 +36,345 @@ from model_params.cmodel import get_SIR
 
 EquationDict = Dict[int, Sequence[sym.Eq]]
 
-CAP_FRACTIONS_DEFAULT = (0.25, 0.5, 0.75)
-RESULT_FIELDS = [
+
+@dataclass(frozen=True)
+class GraphSpec:
+    """Describe a named graph whose builder returns a fresh networkx object."""
+
+    name: str
+    builder: Callable[[], nx.Graph]
+
+
+@dataclass(frozen=True)
+class VariantConfig:
+    """Configuration for a particular system (full/closed/truncated)."""
+
+    label: str
+    kind: str  # "full", "closed", or "truncated"
+    closures: bool
+    cap: Optional[int]
+
+
+@dataclass
+class VariantResult:
+    """Hold timings, solution metadata, and errors for a single variant."""
+
+    graph_name: str
+    num_vertices: int
+    config: VariantConfig
+    equation_count: int = 0
+    generation_time: float = 0.0
+    solve_time: Optional[float] = None
+    solve_success: bool = False
+    generation_error: Optional[str] = None
+    solve_error: Optional[str] = None
+    equations: Optional[EquationDict] = None
+    lhs: Sequence[sym.Expr] = ()
+    solution: Any = None
+    mean_abs_error_full: Optional[float] = None
+    max_abs_error_full: Optional[float] = None
+    mean_abs_error_closed: Optional[float] = None
+    max_abs_error_closed: Optional[float] = None
+
+
+def build_lollipop_graph() -> nx.Graph:
+    graph = nx.Graph()
+    graph.add_nodes_from(range(4))
+    graph.add_edges_from([(0, 1), (0, 2), (1, 2), (1, 3)])
+    return graph
+
+
+def _path_builder(size: int) -> Callable[[], nx.Graph]:
+    def _builder() -> nx.Graph:
+        return nx.path_graph(size)
+
+    return _builder
+
+
+GRAPH_SPECS: Dict[str, GraphSpec] = {
+    "lollipop": GraphSpec("lollipop", build_lollipop_graph),
+    "path_5": GraphSpec("path_5", _path_builder(5)),
+    "path_10": GraphSpec("path_10", _path_builder(10)),
+}
+DEFAULT_GRAPHS = tuple(GRAPH_SPECS.keys())
+DEFAULT_CAP_FRACTIONS = (0.25, 0.5, 0.75)
+
+CSV_FIELDS = [
     "timestamp",
     "hostname",
-    "graph_type",
-    "seed",
+    "graph",
     "num_vertices",
-    "graph_params",
     "variant",
+    "variant_kind",
     "closures",
     "cap",
+    "equation_count",
     "generation_time",
     "solve_time",
-    "equation_count",
     "solve_success",
     "mean_abs_error_full",
     "max_abs_error_full",
     "mean_abs_error_closed",
     "max_abs_error_closed",
-    "solution_final_time",
-    "solution_final_values",
     "generation_error",
     "solve_error",
 ]
 
-@dataclass
-class VariantResult:
-    name: str
-    closures: bool
-    cap: Optional[int]
-    generation_time: float
-    solve_time: Optional[float]
-    equation_count: int
-    solve_success: bool
-    mean_abs_error_full: Optional[float] = None
-    max_abs_error_full: Optional[float] = None
-    mean_abs_error_closed: Optional[float] = None
-    max_abs_error_closed: Optional[float] = None
-    generation_error: Optional[str] = None
-    solve_error: Optional[str] = None
-    solution: Any = None
-    lhs: Sequence[sym.Expr] = ()
+
+def collect_lhs_functions(equations: EquationDict) -> List[sym.Expr]:
+    functions: List[sym.Expr] = []
+    for eq_list in equations.values():
+        for eq in eq_list:
+            functions.append(sym.Integral(eq.lhs).doit())
+    return functions
 
 
-def build_graph(graph_type: str, num_vertices: int, seed: int, p: float, m: int) -> nx.Graph:
-    gt = graph_type.lower()
-    if gt == "path":
-        return nx.path_graph(num_vertices)
-    if gt == "cycle":
-        return nx.cycle_graph(num_vertices)
-    if gt in {"erdos_renyi", "gnp"}:
-        return nx.erdos_renyi_graph(num_vertices, p, seed=seed)
-    if gt == "barabasi_albert":
-        return nx.barabasi_albert_graph(num_vertices, m, seed=seed)
-    raise ValueError(f"Unsupported graph type {graph_type}")
+def compute_caps(num_vertices: int, fractions: Sequence[float]) -> List[int]:
+    raw = {max(1, int(round(num_vertices * frac))) for frac in fractions}
+    return sorted(raw)
 
 
-def variant_plan(n: int, fractions: Sequence[float]) -> List[Tuple[str, bool, Optional[int]]]:
-    plan: List[Tuple[str, bool, Optional[int]]] = [
-        ("full", False, None),
-        ("closed", True, None),
+def variant_plan(num_vertices: int, fractions: Sequence[float]) -> List[VariantConfig]:
+    variants = [
+        VariantConfig("full", "full", closures=False, cap=None),
+        VariantConfig("closed", "closed", closures=True, cap=None),
     ]
-    for frac in fractions:
-        cap = max(1, round(n * frac))
-        plan.append((f"cap_{int(round(frac*100))}", False, cap))
-    return plan
+    for cap in compute_caps(num_vertices, fractions):
+        variants.append(
+            VariantConfig(label=f"cap_{cap}", kind="truncated", closures=False, cap=cap)
+        )
+    return variants
 
 
-def make_lhs(equations: EquationDict) -> List[sym.Expr]:
-    lhs: List[sym.Expr] = []
-    for eqs in equations.values():
-        for eq in eqs:
-            lhs.append(cast(sym.Expr, sym.Integral(eq.lhs).doit()))
-    return lhs
+def generate_variant(
+    graph_name: str,
+    num_vertices: int,
+    graph: nx.Graph,
+    model: Any,
+    config: VariantConfig,
+) -> VariantResult:
+    start = time.perf_counter()
+    try:
+        equations = generate_equations(
+            copy.deepcopy(graph),
+            model,
+            closures=config.closures,
+            term_cap=config.cap,
+        )
+        gen_time = time.perf_counter() - start
+    except Exception as exc:  # noqa: BLE001
+        return VariantResult(
+            graph_name=graph_name,
+            num_vertices=num_vertices,
+            config=config,
+            generation_time=0.0,
+            generation_error=str(exc),
+        )
 
-
-def initial_cond(graph: nx.Graph, lhs: Sequence[sym.Expr], num_initial: int) -> Dict[sym.Expr, float]:
-    return initial_conditions(
-        list(graph.nodes),
-        lhs,
-        num_initial_infected=num_initial,
-        symbol=sym.symbols("t"),
+    eq_count = sum(len(group) for group in equations.values())
+    lhs = collect_lhs_functions(equations)
+    return VariantResult(
+        graph_name=graph_name,
+        num_vertices=num_vertices,
+        config=config,
+        equation_count=eq_count,
+        generation_time=gen_time,
+        equations=equations,
+        lhs=lhs,
     )
 
 
-def generate_and_solve(graph: nx.Graph, model, name: str, closures: bool, cap: Optional[int], num_initial: int, t_max: float) -> VariantResult:
-    gen_start = time.monotonic()
+def build_initial_conditions(
+    graph: nx.Graph,
+    results: Sequence[VariantResult],
+    num_initial_infected: int,
+) -> Optional[Dict[sym.Expr, float]]:
+    lhs_pool: List[sym.Expr] = []
+    for res in results:
+        lhs_pool.extend(res.lhs)
+    if not lhs_pool:
+        return None
+    deduped = list(dict.fromkeys(lhs_pool))
+    return initial_conditions(
+        list(graph.nodes),
+        deduped,
+        num_initial_infected=num_initial_infected,
+        symbol=0,
+    )
+
+
+def solve_variant(
+    graph: nx.Graph,
+    init_cond: Dict[sym.Expr, float],
+    t_max: float,
+    result: VariantResult,
+) -> None:
+    if result.equations is None:
+        return
+    start = time.perf_counter()
     try:
-        equations = generate_equations(graph, model, closures=closures, term_cap=cap)
-        gen_time = time.monotonic() - gen_start
+        solution = solve_equations(result.equations, init_cond, graph, t_max)
+        result.solve_time = time.perf_counter() - start
+        result.solve_success = bool(getattr(solution, "success", False))
+        result.solution = solution
     except Exception as exc:  # noqa: BLE001
-        return VariantResult(name=name, closures=closures, cap=cap, generation_time=0.0, solve_time=None, equation_count=0, solve_success=False, generation_error=str(exc))
-
-    lhs = make_lhs(equations)
-    solve_time: Optional[float] = None
-    solution = None
-    solve_success = False
-    solve_error: Optional[str] = None
-    if lhs:
-        try:
-            ic = initial_cond(graph, lhs, num_initial)
-            solve_start = time.monotonic()
-            solution = solve_equations(equations, ic, graph, t_max)
-            solve_time = time.monotonic() - solve_start
-            solve_success = bool(getattr(solution, "success", False))
-        except Exception as exc:  # noqa: BLE001
-            solve_error = str(exc)
-            solve_time = None
-            solve_success = False
-    count = sum(len(v) for v in equations.values())
-    return VariantResult(name=name, closures=closures, cap=cap, generation_time=gen_time, solve_time=solve_time, equation_count=count, solve_success=solve_success, solve_error=solve_error, solution=solution, lhs=lhs)
+        result.solve_time = None
+        result.solve_success = False
+        result.solve_error = str(exc)
 
 
-def interpolation_grid(a: Any, b: Any, t_max: float, samples: int) -> Optional[np.ndarray]:
-    if not all(getattr(sol, "success", False) for sol in (a, b)):
+def _total_infected(solution: Any) -> Optional[np.ndarray]:
+    y = np.asarray(getattr(solution, "y", []))
+    if y.ndim != 2:
         return None
-    end = min(getattr(a, "t", [t_max])[-1], getattr(b, "t", [t_max])[-1], t_max)
-    if end <= 0:
+    infected_rows = list(range(1, y.shape[0], 3))
+    if not infected_rows:
         return None
-    return np.linspace(0, end, samples)
+    return y[infected_rows, :].sum(axis=0)
 
 
-def interpolate(solution: Any, lhs: Sequence[sym.Expr], grid: np.ndarray) -> Dict[str, np.ndarray]:
-    arr = np.asarray(solution.y)
-    times = np.asarray(solution.t)
-    mapping = {str(fn): i for i, fn in enumerate(lhs)}
-    out: Dict[str, np.ndarray] = {}
-    for name, idx in mapping.items():
-        out[name] = np.interp(grid, times, arr[idx])
-    return out
+def compare_total_infected(reference: Any, candidate: Any) -> Optional[Tuple[float, float]]:
+    ref_curve = _total_infected(reference)
+    cand_curve = _total_infected(candidate)
+    if ref_curve is None or cand_curve is None:
+        return None
+    t_ref = np.asarray(getattr(reference, "t", []))
+    t_cand = np.asarray(getattr(candidate, "t", []))
+    if t_ref.size == 0 or t_cand.size == 0:
+        return None
+    cand_interp = np.interp(t_ref, t_cand, cand_curve)
+    diff = np.abs(cand_interp - ref_curve)
+    return float(diff.mean()), float(diff.max())
 
 
-def attach_errors(reference: VariantResult, candidate: VariantResult, field_prefix: str, t_max: float, samples: int) -> None:
-    if not (reference.solve_success and candidate.solve_success):
-        return
-    grid = interpolation_grid(reference.solution, candidate.solution, t_max, samples)
-    if grid is None:
-        return
-    ref_vals = interpolate(reference.solution, reference.lhs, grid)
-    cand_vals = interpolate(candidate.solution, candidate.lhs, grid)
-    shared = set(ref_vals) & set(cand_vals)
-    if not shared:
-        return
-    means: List[float] = []
-    maxes: List[float] = []
-    for key in shared:
-        diff = np.abs(ref_vals[key] - cand_vals[key])
-        means.append(float(np.mean(diff)))
-        maxes.append(float(np.max(diff)))
-    setattr(candidate, f"mean_abs_error_{field_prefix}", float(np.mean(means)))
-    setattr(candidate, f"max_abs_error_{field_prefix}", float(np.max(maxes)))
+def attach_total_infected_errors(results: Sequence[VariantResult]) -> None:
+    full = next((r for r in results if r.config.kind == "full" and r.solve_success), None)
+    closed = next((r for r in results if r.config.kind == "closed" and r.solve_success), None)
+    for res in results:
+        if not res.solve_success or res.config.kind == "full":
+            continue
+        if full is not None:
+            metrics = compare_total_infected(full.solution, res.solution)
+            if metrics is not None:
+                res.mean_abs_error_full, res.max_abs_error_full = metrics
+        if closed is not None and res.config.kind != "closed":
+            metrics = compare_total_infected(closed.solution, res.solution)
+            if metrics is not None:
+                res.mean_abs_error_closed, res.max_abs_error_closed = metrics
 
 
-def hostname_index(hostname: str) -> Optional[int]:
-    # Expect names like fatanode01, fatanode02, etc.
-    if "fatanode" in hostname:
-        for part in hostname.split("fatanode"):
-            if part and part.isdigit():
-                return int(part) - 1  # zero-based
-    return None
+def run_for_graph(
+    spec: GraphSpec,
+    cap_fractions: Sequence[float],
+    model: Any,
+    num_initial_infected: int,
+    t_max: float,
+) -> List[VariantResult]:
+    graph = spec.builder()
+    num_vertices = graph.number_of_nodes()
+    configs = variant_plan(num_vertices, cap_fractions)
+    results = [generate_variant(spec.name, num_vertices, graph, model, cfg) for cfg in configs]
+
+    init_cond = build_initial_conditions(graph, results, num_initial_infected)
+    if init_cond is None:
+        return results
+
+    for res in results:
+        solve_variant(graph, init_cond, t_max, res)
+
+    attach_total_infected_errors(results)
+    return results
 
 
-def partition(items: Sequence[Any], index: Optional[int], count: Optional[int]) -> List[Any]:
-    if index is None or count is None or count <= 0:
-        return list(items)
-    return [item for i, item in enumerate(items) if i % count == index]
+def row_from_result(result: VariantResult, hostname: str) -> Dict[str, Any]:
+    return {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "hostname": hostname,
+        "graph": result.graph_name,
+        "num_vertices": result.num_vertices,
+        "variant": result.config.label,
+        "variant_kind": result.config.kind,
+        "closures": result.config.closures,
+        "cap": result.config.cap,
+        "equation_count": result.equation_count,
+        "generation_time": result.generation_time,
+        "solve_time": result.solve_time,
+        "solve_success": result.solve_success,
+        "mean_abs_error_full": result.mean_abs_error_full,
+        "max_abs_error_full": result.max_abs_error_full,
+        "mean_abs_error_closed": result.mean_abs_error_closed,
+        "max_abs_error_closed": result.max_abs_error_closed,
+        "generation_error": result.generation_error,
+        "solve_error": result.solve_error,
+    }
 
 
-def write_results(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
+def append_rows(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
     rows = list(rows)
     if not rows:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     exists = path.exists()
-    with path.open("a", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=RESULT_FIELDS)
+    with path.open("a", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS)
         if not exists:
-            w.writeheader()
-        for r in rows:
-            w.writerow({k: r.get(k) for k in RESULT_FIELDS})
+            writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field) for field in CSV_FIELDS})
 
 
-def serialize_solution(sol: Any) -> Tuple[Optional[float], Optional[str]]:
-    if sol is None or not getattr(sol, "success", False):
-        return None, None
-    final_t = float(getattr(sol, "t", [None])[-1])
-    try:
-        final_vec = [float(v) for v in np.asarray(sol.y)[:, -1]]
-    except Exception:  # noqa: BLE001
-        final_vec = []
-    return final_t, json.dumps(final_vec)
-
-
-def run_job(graph_type: str, seed: int, num_vertices: int, p: float, m: int, cap_fracs: Sequence[float], num_initial: int, t_max: float, samples: int, beta: float, gamma: float) -> List[VariantResult]:
-    graph = build_graph(graph_type, num_vertices, seed, p=p, m=m)
-    model = get_SIR(beta, gamma)
-    results: List[VariantResult] = []
-    for name, closures, cap in variant_plan(graph.number_of_nodes(), cap_fracs):
-        vr = generate_and_solve(graph, model, name, closures, cap, num_initial, t_max)
-        results.append(vr)
-    full = next((r for r in results if r.name == "full"), None)
-    closed = next((r for r in results if r.name == "closed"), None)
-    for r in results:
-        if r is full or not r.solve_success:
-            continue
-        if full and full.solve_success:
-            attach_errors(full, r, "full", t_max, samples)
-        if closed and closed.solve_success:
-            attach_errors(closed, r, "closed", t_max, samples)
-    return results
-
-
-def args_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Parallel capped system experiments for fatanodes")
-    p.add_argument("--graph-types", nargs="+", default=["path", "cycle", "erdos_renyi", "barabasi_albert"], help="Graph types")
-    p.add_argument("--num-vertices", type=int, default=30)
-    p.add_argument("--seeds", nargs="+", type=int, default=[1, 2, 3, 4])
-    p.add_argument("--erdos-renyi-p", type=float, default=0.1, dest="er_p")
-    p.add_argument("--barabasi-m", type=int, default=2, dest="ba_m")
-    p.add_argument("--cap-fractions", nargs="+", type=float, default=list(CAP_FRACTIONS_DEFAULT))
-    p.add_argument("--num-initial-infected", type=int, default=1)
-    p.add_argument("--t-max", type=float, default=6.0)
-    p.add_argument("--samples", type=int, default=60)
-    p.add_argument("--beta", type=float, default=0.8)
-    p.add_argument("--gamma", type=float, default=0.2)
-    p.add_argument("--output", type=str, default="data/fatanode_results.csv")
-    p.add_argument("--parallel", type=int, default=os.cpu_count() or 4)
-    p.add_argument("--node-index", type=int, help="Explicit node index (0-based)")
-    p.add_argument("--node-count", type=int, help="Total nodes participating")
-    return p
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run truncation sweeps on small graphs")
+    parser.add_argument(
+        "--graphs",
+        nargs="+",
+        default=list(DEFAULT_GRAPHS),
+        choices=sorted(GRAPH_SPECS.keys()),
+        help="Subset of graph names to evaluate",
+    )
+    parser.add_argument(
+        "--cap-fractions",
+        nargs="+",
+        type=float,
+        default=list(DEFAULT_CAP_FRACTIONS),
+        help="Fractions of |V| used to derive truncation caps",
+    )
+    parser.add_argument("--num-initial-infected", type=int, default=1)
+    parser.add_argument("--t-max", type=float, default=5.0)
+    parser.add_argument("--beta", type=float, default=0.8)
+    parser.add_argument("--gamma", type=float, default=0.2)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("data/fatanode_truncation_summary.csv"),
+        help="CSV file to append results to",
+    )
+    return parser.parse_args(argv)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    parser = args_parser()
-    args = parser.parse_args(argv)
+    args = parse_args(argv)
 
+    specs = [GRAPH_SPECS[name] for name in args.graphs]
+    model = get_SIR(args.beta, args.gamma)
     hostname = socket.gethostname()
-    auto_index = hostname_index(hostname)
-    node_index = args.node_index if args.node_index is not None else auto_index
-    node_count = args.node_count
-
-    jobs: List[Tuple[str, int]] = []
-    for g in args.graph_types:
-        for s in args.seeds:
-            jobs.append((g, s))
-    jobs = partition(jobs, node_index, node_count)
-
-    if not jobs:
-        print("No jobs for this node; exiting.")
-        return 0
 
     all_rows: List[Dict[str, Any]] = []
-    for graph_type, seed in jobs:
-        results = run_job(
-            graph_type=graph_type,
-            seed=seed,
-            num_vertices=args.num_vertices,
-            p=args.er_p,
-            m=args.ba_m,
-            cap_fracs=args.cap_fractions,
-            num_initial=args.num_initial_infected,
+    for spec in specs:
+        graph = spec.builder()
+        print(f"Running {spec.name} graph (n={graph.number_of_nodes()})")
+        results = run_for_graph(
+            spec=spec,
+            cap_fractions=args.cap_fractions,
+            model=model,
+            num_initial_infected=args.num_initial_infected,
             t_max=args.t_max,
-            samples=args.samples,
-            beta=args.beta,
-            gamma=args.gamma,
         )
-        for r in results:
-            final_t, final_vals = serialize_solution(r.solution)
-            row = {
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "hostname": hostname,
-                "graph_type": graph_type,
-                "seed": seed,
-                "num_vertices": args.num_vertices,
-                "graph_params": json.dumps({"p": args.er_p, "m": args.ba_m}, sort_keys=True),
-                "variant": r.name,
-                "closures": r.closures,
-                "cap": r.cap,
-                "generation_time": r.generation_time,
-                "solve_time": r.solve_time,
-                "equation_count": r.equation_count,
-                "solve_success": r.solve_success,
-                "mean_abs_error_full": r.mean_abs_error_full,
-                "max_abs_error_full": r.max_abs_error_full,
-                "mean_abs_error_closed": r.mean_abs_error_closed,
-                "max_abs_error_closed": r.max_abs_error_closed,
-                "solution_final_time": final_t,
-                "solution_final_values": final_vals,
-                "generation_error": r.generation_error,
-                "solve_error": r.solve_error,
-            }
-            all_rows.append(row)
-        print(f"Completed {graph_type} seed={seed} ({len(results)} variants)")
+        for res in results:
+            all_rows.append(row_from_result(res, hostname))
+        print(f"  Completed {spec.name}: {len(results)} variants")
 
-    write_results(Path(args.output), all_rows)
+    append_rows(args.output, all_rows)
     print(f"Wrote {len(all_rows)} rows to {args.output}")
     return 0
 

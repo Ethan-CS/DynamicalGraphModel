@@ -3,10 +3,10 @@ from time import time
 import networkx as nx
 import sympy as sym
 
-from src.equation.Term import Vertex, Term
-from src.equation.generation import generate_equations
-from src.equation.solving import initial_conditions, solve_equations
-from src.model_params.cmodel import CModel, get_SIR
+from equation.Term import Vertex, Term
+from equation.generation import generate_equations
+from equation.solving import initial_conditions, solve_equations
+from model_params.cmodel import CModel, get_SIR
 
 
 def main():

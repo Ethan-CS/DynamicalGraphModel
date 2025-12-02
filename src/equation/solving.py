@@ -4,9 +4,9 @@ from time import time
 import sympy as sym
 from scipy.integrate import solve_ivp
 
-from src.equation.Term import Term, Vertex
-from src.equation.closing import can_be_closed, replace_with_closures
-from src.equation.generation import format_term
+from equation.Term import Term, Vertex
+from equation.closing import can_be_closed, replace_with_closures
+from equation.generation import format_term
 
 
 def initial_conditions(nodes, functions, choice=None, num_initial_infected=1, symbol=0, yes=1, no=0):

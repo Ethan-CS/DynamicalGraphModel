@@ -15,6 +15,11 @@ This project is used in a publication[^1] that assesses more broadly this approa
 - To approximate the dynamics, pass `term_cap=<max_size>` to `equation.generation.generate_equations`. Terms with more vertices can still appear on the RHS, but only terms up to the cap receive their own equations. Omitting the cap (the default) reproduces the full system.
 - If you'd like to compare to a Monte Carlo simulation, go to `monte_carlo.equation_MC_comparison.py` for examples used in the associated publication
 
+## Truncation demo script
+
+- `src/testing/truncation_demo.py` showcases the entire workflow on a small "lollipop" graph: it prints the full and closure-based equation systems, generates truncated variants for several term caps, and times ODE solves for both the truncated and closed systems while reporting approximation errors.
+- This script was written as a sanity check that truncation logic is behaving as expected before launching large experiments.
+
 ## Large-scale experiments
 
 - Use `PYTHONPATH=src python -m experiments.run_experiments --help` to discover the CLI for running larger runtimes, including 100-vertex graphs, multiple graph families, and long timeouts. Experiments can be described ad-hoc via flags or via a JSON file (see `experiments/config.py`).
